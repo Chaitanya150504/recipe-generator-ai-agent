@@ -14,22 +14,31 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
 app.use(express.json());
 
-// Initialize GoogleGenAI
-const apiKey = process.env.GEMINI_API_KEY;
-let ai: GoogleGenAI | null = null;
+// Initialize GoogleGenAI with multi-environment variable resolution
+function getActiveApiKey(): string | null {
+  return (
+    process.env.GEMINI_API_KEY ||
+    process.env.API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.VITE_GEMINI_API_KEY ||
+    null
+  );
+}
 
-if (apiKey) {
-  ai = new GoogleGenAI({
-    apiKey,
+function getGeminiClient(): GoogleGenAI | null {
+  const key = getActiveApiKey();
+  if (!key) return null;
+  return new GoogleGenAI({
+    apiKey: key,
     httpOptions: {
       headers: {
-        'User-Agent': 'aistudio-build',
+        'User-Agent': 'aistudio-recipe-generator',
       },
     },
   });
-} else {
-  console.warn('GEMINI_API_KEY is not defined. AI endpoints will provide curated regional fallbacks.');
 }
+
+let ai = getGeminiClient();
 
 async function generateAIContent(options: {
   contents: string;
@@ -37,19 +46,28 @@ async function generateAIContent(options: {
   responseMimeType?: string;
   timeoutMs?: number;
 }): Promise<string> {
-  if (!ai) {
-    throw new Error('Gemini AI client is not initialized. Please ensure GEMINI_API_KEY is configured.');
+  const client = getGeminiClient();
+  if (!client) {
+    const err: any = new Error(
+      'GEMINI_API_KEY is not configured in environment variables. ' +
+      'Please add GEMINI_API_KEY in your Vercel Project Settings -> Environment Variables or .env file.'
+    );
+    err.status = 403;
+    throw err;
   }
 
   const timeoutMs = options.timeoutMs || 25000;
-  // Models to attempt: 'gemini-3.1-flash-lite' first (high performance & active free-tier quota), then 'gemini-3.8-flash'
-  const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+  // Models to attempt:
+  // 1. gemini-3.1-flash-lite (fast, cost-effective, active free quota)
+  // 2. gemini-3.8-flash (multimodal standard)
+  // 3. gemini-2.5-flash (reliable high-throughput fallback)
+  const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash'];
   let lastError: any = null;
 
   for (const model of candidateModels) {
     try {
       const response = await Promise.race([
-        ai.models.generateContent({
+        client.models.generateContent({
           model,
           contents: options.contents,
           config: {
@@ -67,12 +85,20 @@ async function generateAIContent(options: {
         return text.trim();
       }
     } catch (err: any) {
-      console.warn(`Attempt with ${model} failed:`, err?.message || err);
+      console.warn(`[Gemini] Attempt with model "${model}" failed:`, err?.message || err);
       lastError = err;
+
+      if (err?.status === 403 || err?.message?.includes('API_KEY_INVALID') || err?.message?.includes('PERMISSION_DENIED')) {
+        const error: any = new Error('The configured GEMINI_API_KEY is invalid or lacks permissions. Please verify your Google AI Studio API key.');
+        error.status = 403;
+        throw error;
+      }
     }
   }
 
-  throw lastError || new Error('All AI models failed to generate content');
+  const error: any = new Error(lastError?.message || 'All AI models failed to generate content');
+  error.status = lastError?.status || (lastError?.message?.includes('RESOURCE_EXHAUSTED') ? 429 : 500);
+  throw error;
 }
 
 function withTimeout<T>(promise: Promise<T>, ms = 20000): Promise<T> {
@@ -1612,9 +1638,15 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Global Recipe Generator AI Agent running on http://0.0.0.0:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Global Recipe Generator AI Agent running on http://0.0.0.0:${PORT}`);
+    });
+  }
 }
 
-startServer();
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;

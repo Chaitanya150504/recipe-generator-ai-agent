@@ -11,7 +11,7 @@ import { RecipeView } from './components/RecipeView';
 import { AICookingAssistant } from './components/AICookingAssistant';
 import { SubstitutionModal } from './components/SubstitutionModal';
 import { DietaryPreference, DishPreview, RecipeData, ChatMessage } from './types';
-import { ChefHat, Globe2, AlertCircle } from 'lucide-react';
+import { ChefHat, Globe2, AlertCircle, X } from 'lucide-react';
 
 export default function App() {
   const [currentDietary, setCurrentDietary] = useState<DietaryPreference>('all');
@@ -112,7 +112,19 @@ What dish would you like to prepare today?`,
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || `Failed to generate recipe for "${dishName}".`);
+        let message = errData.error;
+        if (!message) {
+          if (response.status === 404) {
+            message = `API route not found (HTTP 404). If running on Vercel, please verify that Vercel serverless functions and vercel.json are deployed.`;
+          } else if (response.status === 429) {
+            message = `Gemini API quota exceeded (HTTP 429: Resource Exhausted). The free tier daily limit has been reached. Please wait a moment or try again later.`;
+          } else if (response.status === 403) {
+            message = `Gemini API authorization error (HTTP 403). Please verify GEMINI_API_KEY is set in Vercel Project Settings -> Environment Variables.`;
+          } else {
+            message = `Failed to generate authentic recipe for "${dishName}" (HTTP ${response.status}).`;
+          }
+        }
+        throw new Error(message);
       }
 
       const data = await response.json();
@@ -319,9 +331,18 @@ Feel free to ask me follow-up questions such as:
         {/* Global Error Banner */}
         {errorMessage && (
           <div className="max-w-4xl mx-auto px-4 mt-6">
-            <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-sm flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600" />
-              <span>{errorMessage}</span>
+            <div className="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-sm flex items-start justify-between gap-3 shadow-sm">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 text-red-600 mt-0.5" />
+                <span className="leading-relaxed">{errorMessage}</span>
+              </div>
+              <button
+                onClick={() => setErrorMessage(null)}
+                className="text-red-400 hover:text-red-700 transition-colors p-1 rounded-lg hover:bg-red-100 flex-shrink-0"
+                title="Dismiss message"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
         )}
