@@ -74,7 +74,20 @@ What dish would you like to prepare today?`,
       });
 
       if (!response.ok) {
-        throw new Error('Failed to discover regional dishes');
+        const errData = await response.json().catch(() => ({}));
+        let message = errData.error;
+        if (!message) {
+          if (response.status === 403) {
+            message = 'Gemini API key is not configured or unauthorized (HTTP 403). Please check GEMINI_API_KEY in your environment variables.';
+          } else if (response.status === 429) {
+            message = 'Gemini API rate limit reached (HTTP 429). Please wait a moment and try again.';
+          } else if (response.status === 503) {
+            message = 'Gemini model is experiencing temporary high demand (HTTP 503). Please wait a moment and try again.';
+          } else {
+            message = `Failed to discover dishes (HTTP ${response.status}).`;
+          }
+        }
+        throw new Error(message);
       }
 
       const data = await response.json();

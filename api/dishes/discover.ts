@@ -1,166 +1,188 @@
-import { generateAIContent, getCulinaryImage } from '../_lib/gemini';
+import { GoogleGenAI } from '@google/genai';
 
-const REGIONAL_DISH_FALLBACKS: Record<string, any[]> = {
-  'andhra pradesh': [
-    {
-      name: 'Andhra Gongura Mutton / Gongura Pappu',
-      nativeName: 'గోంగూర పప్పు / మాంసం',
-      region: 'Andhra Pradesh',
-      cuisine: 'Telugu / Andhra',
-      description: 'Signature Andhra delicacy infused with tangy sorrel leaves (Gongura), fiery Guntur red chilies, and garlic mustard tempering.',
-      prepTime: '20 mins',
-      cookTime: '35 mins',
-      dietary: ['Non-Vegetarian', 'Vegetarian Option'],
-      spiceLevel: 'Hot',
-      keyIngredients: ['Gongura (Sorrel leaves)', 'Guntur Red Chilies', 'Toor Dal / Mutton', 'Mustard & Garlic Tadka'],
-      imageUrl: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      name: 'Pesarattu Upma',
-      nativeName: 'పెసరట్టు ఉప్మా',
-      region: 'Andhra Pradesh',
-      cuisine: 'Telugu / Andhra',
-      description: 'Crisp green gram (whole moong) crepe topped with minced ginger and cumin, stuffed with piping hot semolina upma, and served with allam (ginger) pachadi.',
-      prepTime: '15 mins',
-      cookTime: '20 mins',
-      dietary: ['Vegetarian', 'Vegan'],
-      spiceLevel: 'Medium',
-      keyIngredients: ['Whole Green Moong', 'Semolina (Upma Rava)', 'Fresh Ginger', 'Green Chilies', 'Cumin'],
-      imageUrl: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      name: 'Royyala Iguru (Andhra Prawn Masala)',
-      nativeName: 'రొయ్యల ఇగురు',
-      region: 'Andhra Pradesh',
-      cuisine: 'Telugu / Andhra',
-      description: 'Succulent fresh prawns slow-cooked in a thick, spicy coastal Andhra reduction of caramelized shallots, poppy seeds paste, and fresh curry leaves.',
-      prepTime: '15 mins',
-      cookTime: '25 mins',
-      dietary: ['Non-Vegetarian'],
-      spiceLevel: 'Hot',
-      keyIngredients: ['Coastal Prawns', 'Shallots', 'Guntur Chili Powder', 'Gasagasalu (Poppy Seeds)', 'Curry Leaves'],
-      imageUrl: 'https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      name: 'Andhra Natu Kodi Pulusu',
-      nativeName: 'నాటుకోడి పులుసు',
-      region: 'Andhra Pradesh',
-      cuisine: 'Telugu / Andhra',
-      description: 'Fiery country chicken stew cooked with stone-ground coriander, black pepper, roasted dry coconut, and tangy tamarind broth.',
-      prepTime: '25 mins',
-      cookTime: '45 mins',
-      dietary: ['Non-Vegetarian'],
-      spiceLevel: 'Extra Hot',
-      keyIngredients: ['Country Chicken', 'Dry Coconut (Kobbari)', 'Coriander Seeds', 'Black Peppercorns', 'Tamarind'],
-      imageUrl: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      name: 'Gutti Vankaya Kura',
-      nativeName: 'గుత్తి వంకాయ కూర',
-      region: 'Andhra Pradesh',
-      cuisine: 'Telugu / Andhra',
-      description: 'Baby purple eggplants slit into quarters and stuffed with a fragrant dry-roasted paste of peanuts, sesame seeds, coconut, and cumin.',
-      prepTime: '20 mins',
-      cookTime: '30 mins',
-      dietary: ['Vegetarian', 'Vegan', 'Gluten-Free'],
-      spiceLevel: 'Medium',
-      keyIngredients: ['Small Purple Brinjals', 'Roasted Peanuts', 'White Sesame Seeds', 'Cumin & Coriander', 'Tamarind Pulp'],
-      imageUrl: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80',
-    },
-    {
-      name: 'Chepala Pulusu',
-      nativeName: 'చేపల పులుసు',
-      region: 'Andhra Pradesh',
-      cuisine: 'Telugu / Andhra',
-      description: 'Traditional earthen-pot fish curry stewed in a rich tamarind gravy with fenugreek and mustard seeds.',
-      prepTime: '20 mins',
-      cookTime: '30 mins',
-      dietary: ['Non-Vegetarian'],
-      spiceLevel: 'Hot',
-      keyIngredients: ['Freshwater Fish (Murrel/Rohu)', 'Tamarind Paste', 'Fenugreek Seeds', 'Guntur Chili', 'Shallots'],
-      imageUrl: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=800&q=80',
+/**
+ * Resolves the Gemini API key from standard environment variable aliases.
+ */
+function getApiKey(): string | null {
+  return (
+    process.env.GEMINI_API_KEY ||
+    process.env.API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.VITE_GEMINI_API_KEY ||
+    null
+  );
+}
+
+/**
+ * Robust request body parser for Vercel serverless and Express runtimes.
+ */
+async function parseRequestBody(req: any): Promise<any> {
+  if (req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body)) {
+    return req.body;
+  }
+  if (typeof req.body === 'string') {
+    try {
+      return JSON.parse(req.body);
+    } catch {
+      return {};
     }
-  ],
-  'telangana': [
-    {
-      name: 'Hyderabadi Dum Biryani',
-      nativeName: 'حیدرآبادی دم بریانی',
-      region: 'Telangana',
-      cuisine: 'Hyderabadi / Telangana',
-      description: 'The royal handi dish: aged basmati rice and marinated meat slow-cooked together with saffron milk and crispy birista onions.',
-      prepTime: '45 mins',
-      cookTime: '50 mins',
-      dietary: ['Non-Vegetarian', 'Vegetarian Option'],
-      spiceLevel: 'Medium',
-      keyIngredients: ['Aged Basmati Rice', 'Kashmiri Saffron', 'Shahi Jeera & Cardamom', 'Yogurt Marination', 'Fried Onions'],
-      imageUrl: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=800&q=80',
+  }
+  return new Promise((resolve) => {
+    let raw = '';
+    req.on('data', (chunk: any) => {
+      raw += chunk;
+    });
+    req.on('end', () => {
+      try {
+        resolve(raw ? JSON.parse(raw) : {});
+      } catch {
+        resolve({});
+      }
+    });
+    req.on('error', () => resolve({}));
+  });
+}
+
+/**
+ * Strips markdown code blocks (e.g. ```json ... ```) from Gemini responses.
+ */
+function cleanJsonOutput(text: string): string {
+  let cleaned = text.trim();
+  if (cleaned.startsWith('```json')) {
+    cleaned = cleaned.slice(7);
+  } else if (cleaned.startsWith('```')) {
+    cleaned = cleaned.slice(3);
+  }
+  if (cleaned.endsWith('```')) {
+    cleaned = cleaned.slice(0, -3);
+  }
+  return cleaned.trim();
+}
+
+/**
+ * Maps dish name / cuisine to high-quality culinary imagery.
+ */
+function getCulinaryImage(dishName: string, cuisineOrRegion = ''): string {
+  const q = (dishName + ' ' + cuisineOrRegion).toLowerCase();
+  if (q.includes('biryani') || q.includes('pulao') || q.includes('rice')) {
+    return 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=1000&q=80';
+  }
+  if (q.includes('pizza') || q.includes('focaccia')) {
+    return 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1000&q=80';
+  }
+  if (q.includes('pasta') || q.includes('carbonara') || q.includes('ragu') || q.includes('spaghetti')) {
+    return 'https://images.unsplash.com/photo-1621996346565-e3d5d6281691?auto=format&fit=crop&w=1000&q=80';
+  }
+  if (q.includes('ramen') || q.includes('noodle') || q.includes('pho') || q.includes('udon')) {
+    return 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1000&q=80';
+  }
+  if (q.includes('sushi') || q.includes('sashimi')) {
+    return 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=1000&q=80';
+  }
+  if (q.includes('taco') || q.includes('burrito') || q.includes('enchilada') || q.includes('mole')) {
+    return 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=1000&q=80';
+  }
+  if (q.includes('curry') || q.includes('paneer') || q.includes('masala') || q.includes('tikka') || q.includes('dal') || q.includes('gongura')) {
+    return 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=1000&q=80';
+  }
+  if (q.includes('dosa') || q.includes('idli') || q.includes('appam') || q.includes('pesarattu')) {
+    return 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=1000&q=80';
+  }
+  return 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1000&q=80';
+}
+
+/**
+ * Execute Gemini prompt across verified models:
+ * 1. gemini-3.1-flash-lite (high availability, fast, generous free quota)
+ * 2. gemini-3.8-flash (standard flash)
+ * 3. gemini-flash-latest (fallback alias)
+ */
+async function callGemini(contents: string, systemInstruction: string): Promise<string> {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    const err: any = new Error(
+      'GEMINI_API_KEY environment variable is not configured. ' +
+      'Please add GEMINI_API_KEY in your Vercel Project Settings -> Environment Variables and redeploy.'
+    );
+    err.status = 403;
+    err.code = 'NO_API_KEY';
+    throw err;
+  }
+
+  const maskedKey = apiKey.length > 8 ? `${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}` : '***';
+  console.log(`[Diagnostic] Calling Gemini API (Key: ${maskedKey}, Length: ${apiKey.length})`);
+
+  const ai = new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-recipe-generator',
+      },
     },
-    {
-      name: 'Sarva Pindi',
-      nativeName: 'సర్వపిండి',
-      region: 'Telangana',
-      cuisine: 'Telangana',
-      description: 'Traditional Telangana crispy skillet bread made with rice flour, chana dal, peanuts, sesame seeds, curry leaves, and green chilies.',
-      prepTime: '15 mins',
-      cookTime: '20 mins',
-      dietary: ['Vegetarian', 'Vegan', 'Gluten-Free'],
-      spiceLevel: 'Medium',
-      keyIngredients: ['Rice Flour', 'Chana Dal (soaked)', 'Roasted Peanuts', 'White Sesame', 'Curry Leaves'],
-      imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=800&q=80',
+  });
+
+  const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
+  let lastError: any = null;
+
+  for (const model of candidateModels) {
+    const startTime = Date.now();
+    try {
+      console.log(`[Diagnostic] Attempting model "${model}"...`);
+      const response = await Promise.race([
+        ai.models.generateContent({
+          model,
+          contents,
+          config: {
+            systemInstruction,
+            responseMimeType: 'application/json',
+          },
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout after 20s on model ${model}`)), 20000)
+        ),
+      ]);
+
+      const text = response.text;
+      if (text && text.trim()) {
+        console.log(`[Diagnostic] Model "${model}" succeeded in ${Date.now() - startTime}ms`);
+        return text.trim();
+      }
+    } catch (err: any) {
+      const elapsed = Date.now() - startTime;
+      console.warn(`[Diagnostic] Model "${model}" failed after ${elapsed}ms:`, {
+        status: err?.status,
+        code: err?.code,
+        message: err?.message,
+      });
+      lastError = err;
+
+      if (err?.status === 403 || err?.message?.includes('API_KEY_INVALID') || err?.message?.includes('PERMISSION_DENIED')) {
+        const error: any = new Error('The configured GEMINI_API_KEY is invalid or lacks permissions. Please check your Google AI Studio API key.');
+        error.status = 403;
+        error.code = 'AUTH_ERROR';
+        throw error;
+      }
     }
-  ],
-  'kerala': [
-    {
-      name: 'Kerala Appam with Vegetable / Chicken Stew',
-      nativeName: 'അപ്പം ഇഷ്‍ടു',
-      region: 'Kerala',
-      cuisine: 'Kerala / South Indian',
-      description: 'Lacy, bowl-shaped fermented rice hoppers with a pillowy soft center, served with fragrant coconut milk stew delicately flavored with cloves and cardamom.',
-      prepTime: '30 mins',
-      cookTime: '25 mins',
-      dietary: ['Vegetarian', 'Vegan', 'Gluten-Free'],
-      spiceLevel: 'Mild',
-      keyIngredients: ['Raw Rice', 'Fresh Coconut Milk', 'Green Cardamom & Cloves', 'Potatoes & Carrots', 'Curry Leaves in Virgin Coconut Oil'],
-      imageUrl: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=800&q=80',
-    }
-  ],
-  'punjab': [
-    {
-      name: 'Sarson Ka Saag & Makki Di Roti',
-      nativeName: 'ਸਰ੍ਹੋਂ ਦਾ ਸਾਗ ਤੇ ਮੱਕੀ ਦੀ ਰੋਟੀ',
-      region: 'Punjab',
-      cuisine: 'Punjabi / North Indian',
-      description: 'Slow-simmered winter mustard greens mashed in earthen handi with cornmeal, crowned with white butter (makhan).',
-      prepTime: '30 mins',
-      cookTime: '60 mins',
-      dietary: ['Vegetarian', 'Gluten-Free'],
-      spiceLevel: 'Medium',
-      keyIngredients: ['Fresh Mustard Greens', 'Makki Atta (Cornmeal)', 'Fresh Ginger & Garlic', 'Desi Ghee', 'White Makhan'],
-      imageUrl: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?auto=format&fit=crop&w=800&q=80',
-    }
-  ],
-  'tamil nadu': [
-    {
-      name: 'Chettinad Kozhi Curry (Chicken Chettinad)',
-      nativeName: 'செட்டிநாடு கோழி வறுவல்',
-      region: 'Tamil Nadu',
-      cuisine: 'Chettinad / South Indian',
-      description: 'Spiced chicken cooked in freshly roasted stone-ground spices: star anise, kalpasi (black stone flower), peppercorn, and coconut paste.',
-      prepTime: '25 mins',
-      cookTime: '35 mins',
-      dietary: ['Non-Vegetarian', 'Gluten-Free'],
-      spiceLevel: 'Hot',
-      keyIngredients: ['Country Chicken', 'Kalpasi (Stone Flower)', 'Black Peppercorns', 'Fennel Seeds', 'Gingelly Oil'],
-      imageUrl: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?auto=format&fit=crop&w=800&q=80',
-    }
-  ]
-};
+  }
+
+  const status = lastError?.status ||
+    (lastError?.message?.includes('RESOURCE_EXHAUSTED') ? 429 :
+    lastError?.message?.includes('UNAVAILABLE') ? 503 : 500);
+
+  const error: any = new Error(lastError?.message || 'All AI models failed to discover dishes');
+  error.status = status;
+  error.code = lastError?.code || (status === 429 ? 'RATE_LIMIT' : status === 503 ? 'SERVICE_UNAVAILABLE' : 'AI_ERROR');
+  throw error;
+}
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+  );
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -170,20 +192,15 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method Not Allowed. Use POST.' });
   }
 
-  try {
-    let body = req.body;
-    if (typeof body === 'string') {
-      try {
-        body = JSON.parse(body);
-      } catch (e) {
-        return res.status(400).json({ error: 'Invalid JSON body' });
-      }
-    }
-    body = body || {};
+  console.log('[Diagnostic] Incoming POST /api/dishes/discover');
 
-    const { query, region, cuisine, dietary } = body;
+  try {
+    const body = await parseRequestBody(req);
+    const { query, region, cuisine, dietary } = body || {};
     const target = (region || cuisine || query || 'Andhra Pradesh').trim();
     const dietaryFilter = dietary && dietary !== 'all' ? `Strictly filter for ${dietary} options only.` : '';
+
+    console.log(`[Diagnostic] Discovering dishes for: "${target}" (Dietary: ${dietary || 'all'})`);
 
     const prompt = `You are an expert culinary anthropologist and master chef specializing in authentic world gastronomies.
 Recommend 6 iconic, authentic, and culturally distinct traditional dishes specifically from "${target}".
@@ -199,55 +216,41 @@ For each dish provide:
 8. "dietary": Array of tags like ["Vegetarian"], ["Vegan"], or ["Non-Vegetarian"], ["Gluten-Free"]
 9. "spiceLevel": One of "Mild", "Medium", "Hot", "Extra Hot"
 10. "keyIngredients": Array of 4 to 6 hallmark ingredients that define this dish
-11. "searchKeyword": 1-2 words best describing food photography for this dish`;
+11. "searchKeyword": 1-2 words best describing food photography for this dish
 
-    try {
-      const text = await generateAIContent({
-        contents: prompt,
-        systemInstruction: 'You are an authentic world culinary anthropologist. Output strictly valid JSON array of regional dishes matching the schema.',
-        responseMimeType: 'application/json',
-        timeoutMs: 20000,
-      });
+Output strictly valid JSON array of dish objects matching these keys.`;
 
-      const parsed = JSON.parse(text ?? '[]');
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const enriched = parsed.map((d: any) => ({
-          ...d,
-          imageUrl: getCulinaryImage(d.name + ' ' + (d.searchKeyword || ''), d.cuisine || target),
-        }));
-        return res.status(200).json({ dishes: enriched, source: 'ai' });
-      }
-    } catch (err: any) {
-      console.warn('Gemini discover error or timeout, checking curated fallback:', err?.message || err);
+    const rawText = await callGemini(
+      prompt,
+      'You are an authentic world culinary anthropologist. Output strictly valid JSON array of regional dishes matching the schema. Never wrap in markdown backticks.'
+    );
+
+    const cleaned = cleanJsonOutput(rawText);
+    const parsed = JSON.parse(cleaned);
+
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      throw new Error(`AI returned an empty or invalid dishes list for "${target}".`);
     }
 
-    const lower = target.toLowerCase();
-    for (const [key, list] of Object.entries(REGIONAL_DISH_FALLBACKS)) {
-      if (lower.includes(key) || key.includes(lower)) {
-        return res.status(200).json({ dishes: list, source: 'curated' });
-      }
-    }
+    const enriched = parsed.map((d: any) => ({
+      ...d,
+      imageUrl: getCulinaryImage(d.name + ' ' + (d.searchKeyword || ''), d.cuisine || target),
+    }));
 
-    return res.status(200).json({
-      dishes: [
-        {
-          name: `${target} Traditional Heritage Plate`,
-          nativeName: target,
-          region: target,
-          cuisine: cuisine || 'Regional',
-          description: `Celebrated regional preparation from ${target} showcasing customary stone-ground spices, ancestral cooking vessels, and authentic flavor equilibrium.`,
-          prepTime: '20 mins',
-          cookTime: '30 mins',
-          dietary: [dietary || 'Vegetarian'],
-          spiceLevel: 'Medium',
-          keyIngredients: ['Heritage Spices', 'Cold-Pressed Oil', 'Aromatics', 'Fresh Seasonal Produce'],
-          imageUrl: getCulinaryImage(target, target),
-        }
-      ],
-      source: 'curated'
-    });
+    console.log(`[Diagnostic] Successfully discovered ${enriched.length} dishes for "${target}"`);
+    return res.status(200).json({ dishes: enriched, source: 'ai' });
   } catch (error: any) {
-    console.error('Error discovering dishes:', error);
-    return res.status(500).json({ error: error?.message || 'Failed to discover dishes' });
+    console.error('[Diagnostic] Error in /api/dishes/discover:', {
+      message: error?.message,
+      status: error?.status,
+      code: error?.code,
+    });
+
+    const status = error?.status || (error?.code === 'NO_API_KEY' ? 403 : 500);
+    return res.status(status).json({
+      error: error?.message || 'Failed to discover regional dishes.',
+      code: error?.code || 'DISH_DISCOVERY_ERROR',
+      status,
+    });
   }
 }

@@ -40,6 +40,19 @@ function getGeminiClient(): GoogleGenAI | null {
 
 let ai = getGeminiClient();
 
+function cleanJsonOutput(text: string): string {
+  let cleaned = text.trim();
+  if (cleaned.startsWith('```json')) {
+    cleaned = cleaned.slice(7);
+  } else if (cleaned.startsWith('```')) {
+    cleaned = cleaned.slice(3);
+  }
+  if (cleaned.endsWith('```')) {
+    cleaned = cleaned.slice(0, -3);
+  }
+  return cleaned.trim();
+}
+
 async function generateAIContent(options: {
   contents: string;
   systemInstruction?: string;
@@ -53,19 +66,22 @@ async function generateAIContent(options: {
       'Please add GEMINI_API_KEY in your Vercel Project Settings -> Environment Variables or .env file.'
     );
     err.status = 403;
+    err.code = 'NO_API_KEY';
     throw err;
   }
 
   const timeoutMs = options.timeoutMs || 25000;
   // Models to attempt:
-  // 1. gemini-3.1-flash-lite (fast, cost-effective, active free quota)
-  // 2. gemini-3.8-flash (multimodal standard)
-  // 3. gemini-2.5-flash (reliable high-throughput fallback)
-  const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash'];
+  // 1. gemini-3.1-flash-lite (fast, active free tier quota, verified operational)
+  // 2. gemini-3.8-flash (standard multimodal flash)
+  // 3. gemini-flash-latest (fallback alias)
+  const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
   let lastError: any = null;
 
   for (const model of candidateModels) {
+    const startTime = Date.now();
     try {
+      console.log(`[Diagnostic] (server.ts) Attempting model "${model}"...`);
       const response = await Promise.race([
         client.models.generateContent({
           model,
@@ -82,22 +98,34 @@ async function generateAIContent(options: {
 
       const text = response.text;
       if (text && text.trim()) {
+        console.log(`[Diagnostic] (server.ts) Model "${model}" succeeded in ${Date.now() - startTime}ms`);
         return text.trim();
       }
     } catch (err: any) {
-      console.warn(`[Gemini] Attempt with model "${model}" failed:`, err?.message || err);
+      const elapsed = Date.now() - startTime;
+      console.warn(`[Diagnostic] (server.ts) Model "${model}" failed after ${elapsed}ms:`, {
+        status: err?.status,
+        code: err?.code,
+        message: err?.message,
+      });
       lastError = err;
 
       if (err?.status === 403 || err?.message?.includes('API_KEY_INVALID') || err?.message?.includes('PERMISSION_DENIED')) {
-        const error: any = new Error('The configured GEMINI_API_KEY is invalid or lacks permissions. Please verify your Google AI Studio API key.');
+        const error: any = new Error('The configured GEMINI_API_KEY is invalid or lacks permissions. Please check your Google AI Studio API key.');
         error.status = 403;
+        error.code = 'AUTH_ERROR';
         throw error;
       }
     }
   }
 
+  const status = lastError?.status ||
+    (lastError?.message?.includes('RESOURCE_EXHAUSTED') ? 429 :
+    lastError?.message?.includes('UNAVAILABLE') ? 503 : 500);
+
   const error: any = new Error(lastError?.message || 'All AI models failed to generate content');
-  error.status = lastError?.status || (lastError?.message?.includes('RESOURCE_EXHAUSTED') ? 429 : 500);
+  error.status = status;
+  error.code = lastError?.code || (status === 429 ? 'RATE_LIMIT' : status === 503 ? 'SERVICE_UNAVAILABLE' : 'AI_ERROR');
   throw error;
 }
 
@@ -1027,38 +1055,15 @@ In traditional Sattvic and Jain cooking styles, onions are omitted by adding a p
 });
 
 // 2. API: Discover Dishes by Region / Country / State
+// 2. API: Discover Dishes by Region / Country / State
 app.post('/api/dishes/discover', async (req, res) => {
+  console.log('[Diagnostic] (server.ts) Incoming POST /api/dishes/discover');
   try {
-    const { region, cuisine, query, dietary } = req.body;
-    const target = (region || cuisine || query || 'Global').trim();
+    const { region, cuisine, query, dietary } = req.body || {};
+    const target = (region || cuisine || query || 'Andhra Pradesh').trim();
     const dietaryFilter = dietary && dietary !== 'all' ? `Dietary requirement: strictly ${dietary}.` : '';
 
-    if (!ai) {
-      const lower = target.toLowerCase();
-      for (const [key, list] of Object.entries(REGIONAL_DISH_FALLBACKS)) {
-        if (lower.includes(key) || key.includes(lower)) {
-          return res.json({ dishes: list, source: 'curated' });
-        }
-      }
-      return res.json({
-        dishes: [
-          {
-            name: `${target} Traditional Heritage Plate`,
-            nativeName: target,
-            region: target,
-            cuisine: cuisine || 'Regional',
-            description: `Celebrated regional preparation from ${target} showcasing customary stone-ground spices, ancestral cooking vessels, and authentic flavor equilibrium.`,
-            prepTime: '20 mins',
-            cookTime: '30 mins',
-            dietary: [dietary || 'Vegetarian'],
-            spiceLevel: 'Medium',
-            keyIngredients: ['Heritage Spices', 'Cold-Pressed Oil', 'Aromatics', 'Fresh Seasonal Produce'],
-            imageUrl: getCulinaryImage(target, target),
-          }
-        ],
-        source: 'curated'
-      });
-    }
+    console.log(`[Diagnostic] (server.ts) Discovering dishes for: "${target}" (Dietary: ${dietary || 'all'})`);
 
     const prompt = `You are an expert culinary anthropologist and master chef specializing in authentic world gastronomies.
 Recommend 6 iconic, authentic, and culturally distinct traditional dishes specifically from "${target}".
@@ -1074,57 +1079,43 @@ For each dish provide:
 8. "dietary": Array of tags like ["Vegetarian"], ["Vegan"], or ["Non-Vegetarian"], ["Gluten-Free"]
 9. "spiceLevel": One of "Mild", "Medium", "Hot", "Extra Hot"
 10. "keyIngredients": Array of 4 to 6 hallmark ingredients that define this dish
-11. "searchKeyword": 1-2 words best describing food photography for this dish`;
+11. "searchKeyword": 1-2 words best describing food photography for this dish
 
-    let enriched: any[] = [];
-    try {
-      const text = await generateAIContent({
-        contents: prompt,
-        systemInstruction: 'You are an authentic world culinary anthropologist. Output strictly valid JSON array of regional dishes matching the schema.',
-        responseMimeType: 'application/json',
-        timeoutMs: 20000,
-      });
+Output strictly valid JSON array of dish objects matching these keys.`;
 
-      const parsed = JSON.parse(text ?? '[]');
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        enriched = parsed.map((d: any) => ({
-          ...d,
-          imageUrl: getCulinaryImage(d.name + ' ' + (d.searchKeyword || ''), d.cuisine || target),
-        }));
-        return res.json({ dishes: enriched, source: 'ai' });
-      }
-    } catch (err: any) {
-      console.warn('Gemini discover error or timeout, using curated fallback:', err.message);
-    }
-
-    const lower = target.toLowerCase();
-    for (const [key, list] of Object.entries(REGIONAL_DISH_FALLBACKS)) {
-      if (lower.includes(key) || key.includes(lower)) {
-        return res.json({ dishes: list, source: 'curated' });
-      }
-    }
-
-    return res.json({
-      dishes: [
-        {
-          name: `${target} Traditional Heritage Plate`,
-          nativeName: target,
-          region: target,
-          cuisine: cuisine || 'Regional',
-          description: `Celebrated regional preparation from ${target} showcasing customary stone-ground spices, ancestral cooking vessels, and authentic flavor equilibrium.`,
-          prepTime: '20 mins',
-          cookTime: '30 mins',
-          dietary: [dietary || 'Vegetarian'],
-          spiceLevel: 'Medium',
-          keyIngredients: ['Heritage Spices', 'Cold-Pressed Oil', 'Aromatics', 'Fresh Seasonal Produce'],
-          imageUrl: getCulinaryImage(target, target),
-        }
-      ],
-      source: 'curated'
+    const rawText = await generateAIContent({
+      contents: prompt,
+      systemInstruction: 'You are an authentic world culinary anthropologist. Output strictly valid JSON array of regional dishes matching the schema. Never wrap in markdown backticks.',
+      responseMimeType: 'application/json',
+      timeoutMs: 20000,
     });
+
+    const cleaned = cleanJsonOutput(rawText);
+    const parsed = JSON.parse(cleaned ?? '[]');
+
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      throw new Error(`AI returned an empty or invalid dishes list for "${target}".`);
+    }
+
+    const enriched = parsed.map((d: any) => ({
+      ...d,
+      imageUrl: getCulinaryImage(d.name + ' ' + (d.searchKeyword || ''), d.cuisine || target),
+    }));
+
+    console.log(`[Diagnostic] (server.ts) Successfully discovered ${enriched.length} dishes for "${target}"`);
+    return res.status(200).json({ dishes: enriched, source: 'ai' });
   } catch (error: any) {
-    console.error('Error discovering dishes:', error);
-    return res.status(500).json({ error: error.message || 'Failed to discover dishes' });
+    console.error('[Diagnostic] (server.ts) Error in /api/dishes/discover:', {
+      message: error?.message,
+      status: error?.status,
+      code: error?.code,
+    });
+    const status = error?.status || (error?.code === 'NO_API_KEY' ? 403 : 500);
+    return res.status(status).json({
+      error: error?.message || 'Failed to discover regional dishes.',
+      code: error?.code || 'DISH_DISCOVERY_ERROR',
+      status,
+    });
   }
 });
 
@@ -1209,7 +1200,8 @@ Return pure JSON matching this exact structure:
       timeoutMs: 25000,
     });
 
-    const parsed = JSON.parse(text);
+    const cleaned = cleanJsonOutput(text);
+    const parsed = JSON.parse(cleaned);
     if (!parsed.recipe_name || !Array.isArray(parsed.ingredients)) {
       throw new Error('Received incomplete recipe structure from AI model.');
     }
@@ -1226,12 +1218,19 @@ Return pure JSON matching this exact structure:
     parsed.requested_dish = cleanDish;
     parsed.image_url = getCulinaryImage(parsed.recipe_name, parsed.region || parsed.cuisine || cleanDish);
 
-    return res.json({ recipe: parsed, source: 'ai' });
+    console.log(`[Diagnostic] (server.ts) Successfully generated recipe for "${cleanDish}": "${parsed.recipe_name}"`);
+    return res.status(200).json({ recipe: parsed, source: 'ai' });
   } catch (error: any) {
-    console.error('Error generating recipe via AI:', error?.message || error);
-    // Properly report error to frontend instead of silently returning canned data (Requirement 8)
-    return res.status(500).json({
-      error: `Failed to generate authentic recipe for "${req.body?.dishName || 'your dish'}": ${error?.message || 'AI service error'}. Please try again.`
+    console.error('[Diagnostic] (server.ts) Error generating recipe via AI:', {
+      message: error?.message,
+      status: error?.status,
+      code: error?.code,
+    });
+    const status = error?.status || (error?.code === 'NO_API_KEY' ? 403 : 500);
+    return res.status(status).json({
+      error: error?.message || `Failed to generate authentic recipe for "${req.body?.dishName || 'your dish'}".`,
+      code: error?.code || 'RECIPE_GEN_ERROR',
+      status,
     });
   }
 });
@@ -1319,18 +1318,14 @@ Return JSON in this format:
   ]
 }`;
 
-    const response = await withTimeout(
-      ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-        },
-      }),
-      8500
-    );
+    const text = await generateAIContent({
+      contents: prompt,
+      responseMimeType: 'application/json',
+      timeoutMs: 15000,
+    });
 
-    const parsed = JSON.parse(response.text ?? '{"suggestions":[]}');
+    const cleaned = cleanJsonOutput(text);
+    const parsed = JSON.parse(cleaned ?? '{"suggestions":[]}');
     if (Array.isArray(parsed.suggestions)) {
       parsed.suggestions = parsed.suggestions.map((s: any) => ({
         ...s,
@@ -1461,18 +1456,14 @@ Return JSON adhering to this schema:
   }
 }`;
 
-    const response = await withTimeout(
-      ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-        },
-      }),
-      8500
-    );
+    const text = await generateAIContent({
+      contents: prompt,
+      responseMimeType: 'application/json',
+      timeoutMs: 15000,
+    });
 
-    const parsed = JSON.parse(response.text ?? '{}');
+    const cleaned = cleanJsonOutput(text);
+    const parsed = JSON.parse(cleaned ?? '{}');
     if (Array.isArray(parsed.variations)) {
       parsed.variations = parsed.variations.map((v: any) => ({
         ...v,
@@ -1564,18 +1555,15 @@ Return JSON array with:
 4. "culinaryAdvice": Exact instructions on how to incorporate it`;
 
     try {
-      const response = await withTimeout(
-        ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: prompt,
-          config: {
-            responseMimeType: 'application/json',
-          },
-        }),
-        6000
-      );
+      const text = await generateAIContent({
+        contents: prompt,
+        systemInstruction: 'You are a culinary science expert. Output strictly valid JSON array of substitutes.',
+        responseMimeType: 'application/json',
+        timeoutMs: 15000,
+      });
 
-      const parsed = JSON.parse(response.text ?? '[]');
+      const cleaned = cleanJsonOutput(text);
+      const parsed = JSON.parse(cleaned ?? '[]');
       return res.json({ substitutes: parsed });
     } catch (err: any) {
       console.warn('Gemini substitute error:', err.message);
