@@ -138,55 +138,178 @@ function withTimeout<T>(promise: Promise<T>, ms = 20000): Promise<T> {
   ]);
 }
 
-// Map cuisine / dish to realistic culinary imagery
-function getCulinaryImage(dishName: string, cuisineOrRegion = ''): string {
-  const q = (dishName + ' ' + cuisineOrRegion).toLowerCase();
-  if (q.includes('biryani') || q.includes('pulao') || q.includes('rice')) {
-    return 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=1000&q=80';
+export const NEUTRAL_FOOD_PLACEHOLDER =
+  'https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=1200&q=80';
+
+export const VERIFIED_DISH_IMAGES: Record<string, string> = {
+  'bread pakoda':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Bread_Pakora_%28Stuffed_with_Mashed-Spicy_Potatoes%29.JPG/1280px-Bread_Pakora_%28Stuffed_with_Mashed-Spicy_Potatoes%29.JPG',
+  'bread pakora':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Bread_Pakora_%28Stuffed_with_Mashed-Spicy_Potatoes%29.JPG/1280px-Bread_Pakora_%28Stuffed_with_Mashed-Spicy_Potatoes%29.JPG',
+  'egg bhurji':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Spicy_egg_bhurji_%40_the_eggfactory.jpg/1280px-Spicy_egg_bhurji_%40_the_eggfactory.jpg',
+  'anda bhurji':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Spicy_egg_bhurji_%40_the_eggfactory.jpg/1280px-Spicy_egg_bhurji_%40_the_eggfactory.jpg',
+  'andhra chicken fry':
+    'https://upload.wikimedia.org/wikipedia/commons/9/96/Andhra_Fried_Chicken.JPG',
+  'kodi vepudu':
+    'https://upload.wikimedia.org/wikipedia/commons/9/96/Andhra_Fried_Chicken.JPG',
+  'chicken curry':
+    'https://upload.wikimedia.org/wikipedia/commons/5/51/Chicken_curry_at_Divewalk_Cafe_-_Sarah_Stierch.jpg',
+  'andhra chicken curry':
+    'https://upload.wikimedia.org/wikipedia/commons/5/51/Chicken_curry_at_Divewalk_Cafe_-_Sarah_Stierch.jpg',
+  'andhra kodi kura':
+    'https://upload.wikimedia.org/wikipedia/commons/5/51/Chicken_curry_at_Divewalk_Cafe_-_Sarah_Stierch.jpg',
+  'japanese ramen':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Shoyu_Ramen%EF%BC%88Tokyo_Ramen%EF%BC%89_-_01.jpg/1280px-Shoyu_Ramen%EF%BC%88Tokyo_Ramen%EF%BC%89_-_01.jpg',
+  'shoyu ramen':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Shoyu_Ramen%EF%BC%88Tokyo_Ramen%EF%BC%89_-_01.jpg/1280px-Shoyu_Ramen%EF%BC%88Tokyo_Ramen%EF%BC%89_-_01.jpg',
+  'ramen':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Shoyu_Ramen%EF%BC%88Tokyo_Ramen%EF%BC%89_-_01.jpg/1280px-Shoyu_Ramen%EF%BC%88Tokyo_Ramen%EF%BC%89_-_01.jpg',
+  'masala dosa':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Masala_Dosa_2023.jpg/1280px-Masala_Dosa_2023.jpg',
+  'dosa':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Masala_Dosa_2023.jpg/1280px-Masala_Dosa_2023.jpg',
+  'pesarattu':
+    'https://upload.wikimedia.org/wikipedia/commons/d/d4/Pesarattu_with_ginger_chutney.jpg',
+  'gongura pachadi':
+    'https://upload.wikimedia.org/wikipedia/commons/9/99/Gongura_chutney.jpg',
+  'gutti vankaya':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Aloo_Gobi_curry.jpg/1280px-Aloo_Gobi_curry.jpg',
+  'idli':
+    'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=1200&q=80',
+  'spaghetti carbonara':
+    'https://images.unsplash.com/photo-1612874742237-6526221588e3?auto=format&fit=crop&w=1200&q=80',
+  'carbonara':
+    'https://images.unsplash.com/photo-1612874742237-6526221588e3?auto=format&fit=crop&w=1200&q=80',
+  'pizza margherita':
+    'https://images.unsplash.com/photo-1604382355076-af4b0eb60143?auto=format&fit=crop&w=1200&q=80',
+  'tacos al pastor':
+    'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=1200&q=80',
+  'hyderabadi dum biryani':
+    'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=1200&q=80',
+  'biryani':
+    'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=1200&q=80',
+  'potato fry':
+    'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=1200&q=80',
+  'aloo fry':
+    'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=1200&q=80',
+  'aloo vepudu':
+    'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=1200&q=80',
+};
+
+function normalizeQuery(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^\w\s]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Resolves an authentic food image for any dish entered by the user.
+ * Prioritizes exact user dish name, searches Wikimedia Commons and Wikipedia,
+ * and falls back to a neutral culinary kitchen prep placeholder.
+ */
+async function resolveExactFoodImage(dishName: string, requestedDish = ''): Promise<string> {
+  const primary = (requestedDish || dishName || '').trim();
+  if (!primary) return NEUTRAL_FOOD_PLACEHOLDER;
+
+  const norm = normalizeQuery(primary);
+  if (VERIFIED_DISH_IMAGES[norm]) {
+    return VERIFIED_DISH_IMAGES[norm];
   }
-  if (q.includes('pizza') || q.includes('focaccia')) {
-    return 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1000&q=80';
+
+  for (const [key, url] of Object.entries(VERIFIED_DISH_IMAGES)) {
+    if (norm === key || (key.length > 4 && (norm.includes(key) || key.includes(norm)))) {
+      return url;
+    }
   }
-  if (q.includes('pasta') || q.includes('carbonara') || q.includes('ragu') || q.includes('spaghetti') || q.includes('orecchiette')) {
-    return 'https://images.unsplash.com/photo-1621996346565-e3d5d6281691?auto=format&fit=crop&w=1000&q=80';
+
+  const headers = {
+    'User-Agent': 'GlobalRecipeAgent/1.0 (https://ais-dev.run.app; recipeagent@aistudio.build)',
+  };
+
+  // Dynamic search on Wikimedia Commons
+  const candidates = [`${primary} food`, primary];
+  for (const q of candidates) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2200);
+      const url = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrnamespace=6&gsrsearch=${encodeURIComponent(
+        q
+      )}&gsrlimit=4&prop=imageinfo&iiprop=url|mime&format=json`;
+
+      const res = await fetch(url, { headers, signal: controller.signal });
+      clearTimeout(timeout);
+
+      if (res.ok) {
+        const data = await res.json();
+        const pages = Object.values(data.query?.pages || {});
+        for (const page of pages as any[]) {
+          const info = page.imageinfo?.[0];
+          const title = (page.title || '').toLowerCase();
+          const isInvalid = [
+            'building',
+            'shop',
+            'restaurant',
+            'store',
+            'map',
+            'flag',
+            'logo',
+            'facade',
+            'street',
+            'sign',
+            'station',
+          ].some((w) => title.includes(w));
+
+          if (!isInvalid && info && info.url) {
+            if (info.mime === 'image/jpeg' || info.mime === 'image/png' || info.mime === 'image/webp') {
+              return info.url;
+            }
+          }
+        }
+      }
+    } catch {
+      // Proceed to next candidate
+    }
   }
-  if (q.includes('ramen') || q.includes('noodle') || q.includes('pho') || q.includes('udon')) {
-    return 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1000&q=80';
+
+  // Dynamic Wikipedia lead image
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2200);
+    const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
+      primary
+    )}&gsrlimit=1&prop=pageimages&pithumbsize=1200&format=json`;
+
+    const res = await fetch(wikiUrl, { headers, signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (res.ok) {
+      const data = await res.json();
+      const page = Object.values(data.query?.pages || {})[0] as any;
+      if (page?.thumbnail?.source) {
+        return page.thumbnail.source;
+      }
+    }
+  } catch {
+    // Return neutral placeholder
   }
-  if (q.includes('sushi') || q.includes('sashimi')) {
-    return 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=1000&q=80';
+
+  return NEUTRAL_FOOD_PLACEHOLDER;
+}
+
+// Synchronous helper for non-async locations
+function getCulinaryImage(dishName: string, requestedDish = ''): string {
+  const norm = normalizeQuery(requestedDish || dishName || '');
+  if (VERIFIED_DISH_IMAGES[norm]) return VERIFIED_DISH_IMAGES[norm];
+  for (const [key, url] of Object.entries(VERIFIED_DISH_IMAGES)) {
+    if (norm === key || (key.length > 4 && (norm.includes(key) || key.includes(norm)))) {
+      return url;
+    }
   }
-  if (q.includes('taco') || q.includes('burrito') || q.includes('enchilada') || q.includes('mole') || q.includes('mexican')) {
-    return 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=1000&q=80';
-  }
-  if (q.includes('pad thai') || q.includes('thai') || q.includes('tom yum')) {
-    return 'https://images.unsplash.com/photo-1559847844-5315695dadae?auto=format&fit=crop&w=1000&q=80';
-  }
-  if (q.includes('dosa') || q.includes('idli') || q.includes('appam') || q.includes('pesarattu') || q.includes('pongal')) {
-    return 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=1000&q=80';
-  }
-  if (q.includes('curry') || q.includes('paneer') || q.includes('masala') || q.includes('tikka') || q.includes('dal') || q.includes('pappu') || q.includes('gongura')) {
-    return 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=1000&q=80';
-  }
-  if (q.includes('croissant') || q.includes('pastry') || q.includes('dessert') || q.includes('cake') || q.includes('tart')) {
-    return 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?auto=format&fit=crop&w=1000&q=80';
-  }
-  if (q.includes('soup') || q.includes('stew') || q.includes('bouillabaisse') || q.includes('pulusu')) {
-    return 'https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=1000&q=80';
-  }
-  if (q.includes('dim sum') || q.includes('dumpling') || q.includes('bao') || q.includes('gyoza') || q.includes('momos')) {
-    return 'https://images.unsplash.com/photo-1496116218417-1a781b1c416c?auto=format&fit=crop&w=1000&q=80';
-  }
-  if (q.includes('salad') || q.includes('bowl')) {
-    return 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1000&q=80';
-  }
-  if (q.includes('fish') || q.includes('seafood') || q.includes('prawn') || q.includes('karimeen') || q.includes('royyala')) {
-    return 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=1000&q=80';
-  }
-  if (q.includes('bread') || q.includes('kulcha') || q.includes('naan') || q.includes('roti') || q.includes('parotta')) {
-    return 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=1000&q=80';
-  }
-  return 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1000&q=80';
+  return NEUTRAL_FOOD_PLACEHOLDER;
 }
 
 // Curated regional dishes fallback database
@@ -296,7 +419,7 @@ const REGIONAL_DISH_FALLBACKS: Record<string, any[]> = {
       dietary: ['Vegetarian', 'Vegan', 'Gluten-Free'],
       spiceLevel: 'Medium',
       keyIngredients: ['Rice Flour', 'Chana Dal (soaked)', 'Roasted Peanuts', 'White Sesame', 'Curry Leaves'],
-      imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=800&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80',
     },
     {
       name: 'Bagara Baingan',
@@ -322,7 +445,7 @@ const REGIONAL_DISH_FALLBACKS: Record<string, any[]> = {
       dietary: ['Vegetarian', 'Vegan', 'Gluten-Free'],
       spiceLevel: 'Mild',
       keyIngredients: ['Raw Rice Flour', 'Sesame Seeds', 'Ajwain (Carom seeds)', 'Sea Salt', 'Peanut Oil'],
-      imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=800&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80',
     }
   ],
   'kerala': [
@@ -363,7 +486,7 @@ const REGIONAL_DISH_FALLBACKS: Record<string, any[]> = {
       dietary: ['Non-Vegetarian'],
       spiceLevel: 'Hot',
       keyIngredients: ['Layered Dough with Ghee', 'Fresh Fennel Seeds', 'Coconut Chunks', 'Black Pepper', 'Curry Leaves'],
-      imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=800&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?auto=format&fit=crop&w=800&q=80',
     }
   ],
   'punjab': [
@@ -391,7 +514,7 @@ const REGIONAL_DISH_FALLBACKS: Record<string, any[]> = {
       dietary: ['Vegetarian'],
       spiceLevel: 'Medium',
       keyIngredients: ['Maida & Ghee Layers', 'Kabuli Chana', 'Anardana (Dried Pomegranate)', 'Ajwain', 'Kasuri Methi'],
-      imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=800&q=80',
+      imageUrl: 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80',
     }
   ],
   'tamil nadu': [
@@ -907,13 +1030,11 @@ Always respond with valid pure JSON matching this exact structure:
     "instructions": [
       { "step_number": 1, "title": "Stage Title", "description": "Step detail", "duration_minutes": 5, "chef_tip": "Pro tip" }
     ],
-    "cooking_tips": ["Tip 1", "Tip 2"],
     "substitutions": [
       { "original": "Item", "substitute": "Replacement", "ratio": "1:1", "notes": "flavor impact" }
     ],
     "serving_suggestions": ["Pairing 1", "Pairing 2"],
     "native_name": "Native name",
-    "cultural_background": "Heritage story",
     "spice_level": "Medium",
     "dietary_tags": ["Vegetarian"],
     "calories_per_serving": 380,
@@ -932,13 +1053,15 @@ Always respond with valid pure JSON matching this exact structure:
 
     // Enrich recipe or dishes with images
     if (parsed.recipe) {
-      parsed.recipe.image_url = getCulinaryImage(parsed.recipe.recipe_name, parsed.recipe.region || parsed.recipe.cuisine);
+      parsed.recipe.image_url = await resolveExactFoodImage(parsed.recipe.recipe_name, parsed.recipe.recipe_name);
     }
     if (Array.isArray(parsed.dishes)) {
-      parsed.dishes = parsed.dishes.map((d: any) => ({
-        ...d,
-        imageUrl: getCulinaryImage(d.name + ' ' + (d.searchKeyword || ''), d.cuisine || activeLocation),
-      }));
+      parsed.dishes = await Promise.all(
+        parsed.dishes.map(async (d: any) => ({
+          ...d,
+          imageUrl: await resolveExactFoodImage(d.name, d.name),
+        }))
+      );
     }
 
     return res.json(parsed);
@@ -1097,10 +1220,12 @@ Output strictly valid JSON array of dish objects matching these keys.`;
       throw new Error(`AI returned an empty or invalid dishes list for "${target}".`);
     }
 
-    const enriched = parsed.map((d: any) => ({
-      ...d,
-      imageUrl: getCulinaryImage(d.name + ' ' + (d.searchKeyword || ''), d.cuisine || target),
-    }));
+    const enriched = await Promise.all(
+      parsed.map(async (d: any) => ({
+        ...d,
+        imageUrl: await resolveExactFoodImage(d.name, d.name),
+      }))
+    );
 
     console.log(`[Diagnostic] (server.ts) Successfully discovered ${enriched.length} dishes for "${target}"`);
     return res.status(200).json({ dishes: enriched, source: 'ai' });
@@ -1159,10 +1284,8 @@ CRITICAL REQUIREMENTS:
     - Explain actual procedures: washing, peeling, cutting, marinating, tempering, boiling, searing, frying, simmering, emulsifying, or assembling.
     - NEVER use generic template step titles like "Temper whole spices and aromatics", "Slow onion caramelization", "Bloom spices and simmer main elements", "Rest and harmonize" unless they are the actual, natural steps for this dish.
     - Each step must have: "step_number" (number), "title" (string), "description" (detailed action steps), "duration_minutes" (number, timer duration), "chef_tip" (expert advice).
-11. "cooking_tips": 2-4 dish-specific secrets (e.g. how to get crispy potatoes without burning, how to prevent eggs from curdling in carbonara, how to get clarity in ramen broth).
-12. "substitutions": Realistic alternatives for the ACTUAL ingredients in this dish (e.g. Pancetta for Guanciale in Carbonara; Cumin for Mustard Seeds in Potato Fry; Tofu for Chashu in Ramen). DO NOT suggest ghee for non-Indian dishes.
-13. "serving_suggestions": 2-3 traditional accompaniments, side dishes, or beverage pairings.
-14. "cultural_background": An informative paragraph on the history, cultural origin, and folklore of this specific dish.
+11. "substitutions": Realistic alternatives for the ACTUAL ingredients in this dish (e.g. Pancetta for Guanciale in Carbonara; Cumin for Mustard Seeds in Potato Fry; Tofu for Chashu in Ramen). DO NOT suggest ghee for non-Indian dishes.
+12. "serving_suggestions": 2-3 traditional accompaniments, side dishes, or beverage pairings.
 
 Return pure JSON matching this exact structure:
 {
@@ -1185,12 +1308,10 @@ Return pure JSON matching this exact structure:
   "cooking_instructions": [
     { "step_number": 1, "title": "Specific Step Title", "description": "Clear step instructions", "duration_minutes": 5, "chef_tip": "Specific chef tip" }
   ],
-  "cooking_tips": ["Tip 1", "Tip 2"],
   "substitutions": [
     { "original": "Item", "substitute": "Alternative", "ratio": "1:1", "notes": "Notes" }
   ],
-  "serving_suggestions": ["Pairing 1", "Pairing 2"],
-  "cultural_background": "Authentic history and cultural context"
+  "serving_suggestions": ["Pairing 1", "Pairing 2"]
 }`;
 
     const text = await generateAIContent({
@@ -1216,9 +1337,9 @@ Return pure JSON matching this exact structure:
     parsed.cooking_instructions = instructionsList;
     parsed.instructions = instructionsList;
     parsed.requested_dish = cleanDish;
-    parsed.image_url = getCulinaryImage(parsed.recipe_name, parsed.region || parsed.cuisine || cleanDish);
+    parsed.image_url = await resolveExactFoodImage(parsed.recipe_name, cleanDish);
 
-    console.log(`[Diagnostic] (server.ts) Successfully generated recipe for "${cleanDish}": "${parsed.recipe_name}"`);
+    console.log(`[Diagnostic] (server.ts) Successfully generated recipe for "${cleanDish}": "${parsed.recipe_name}" (image: ${parsed.image_url})`);
     return res.status(200).json({ recipe: parsed, source: 'ai' });
   } catch (error: any) {
     console.error('[Diagnostic] (server.ts) Error generating recipe via AI:', {

@@ -58,7 +58,7 @@ export interface RecipeData {
   equipment: string[];
   cooking_instructions?: RecipeInstruction[];
   instructions?: RecipeInstruction[];
-  cooking_tips: string[];
+  cooking_tips?: string[];
   substitutions: RecipeSubstitution[];
   serving_suggestions: string[];
   native_name?: string;

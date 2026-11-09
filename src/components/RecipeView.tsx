@@ -16,15 +16,14 @@ import {
   Sparkles,
   Layers,
   UtensilsCrossed,
-  Info,
   Wrench,
-  Lightbulb,
   MessageSquare,
   Globe2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { RecipeData, RecipeIngredient } from '../types';
 import { formatFraction, scaleQuantity, playTimerChime } from '../utils/math';
+import { resolveExactFoodImage, NEUTRAL_FOOD_PLACEHOLDER } from '../utils/culinaryImages';
 
 interface RecipeViewProps {
   recipe: RecipeData;
@@ -54,10 +53,35 @@ export const RecipeView: React.FC<RecipeViewProps> = ({
     (typeof prepTime === 'number' && typeof cookTime === 'number'
       ? `${prepTime + cookTime} mins`
       : '55 mins');
-  const imageUrl =
+
+  const initialImageUrl =
     recipe.image_url ||
     (recipe as any).imageUrl ||
-    'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1200&q=80';
+    NEUTRAL_FOOD_PLACEHOLDER;
+
+  const [heroImage, setHeroImage] = useState<string>(initialImageUrl);
+
+  // Dynamically ensure the image matches the exact recipe dish whenever recipe changes
+  useEffect(() => {
+    let isCancelled = false;
+    const dishQuery = recipe.requested_dish || recipe.recipe_name || (recipe as any).dishName || '';
+
+    if (recipe.image_url && recipe.image_url !== NEUTRAL_FOOD_PLACEHOLDER) {
+      setHeroImage(recipe.image_url);
+    } else if (dishQuery) {
+      resolveExactFoodImage(dishQuery, dishQuery).then((resolved) => {
+        if (!isCancelled) {
+          setHeroImage(resolved);
+        }
+      });
+    } else {
+      setHeroImage(NEUTRAL_FOOD_PLACEHOLDER);
+    }
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [recipe.recipe_name, recipe.requested_dish, recipe.image_url]);
 
   // Serving-size adjustment
   const [servings, setServings] = useState<number>(defaultServings);
@@ -215,7 +239,6 @@ export const RecipeView: React.FC<RecipeViewProps> = ({
   };
 
   const instructions = recipe.cooking_instructions || recipe.instructions || [];
-  const cookingTips = recipe.cooking_tips || (recipe as any).chefTips || [];
   const equipment = recipe.equipment || [];
   const substitutions = recipe.substitutions || (recipe as any).commonSubstitutions || [];
   const servingSuggestions = recipe.serving_suggestions || (recipe as any).pairings || [];
@@ -288,8 +311,13 @@ export const RecipeView: React.FC<RecipeViewProps> = ({
       <div className="relative rounded-3xl overflow-hidden shadow-lg border border-[#D9E2DC] bg-white text-white mb-8">
         <div className="relative h-72 sm:h-96 w-full overflow-hidden">
           <img
-            src={imageUrl}
+            src={heroImage}
             alt={recipeName}
+            onError={() => {
+              if (heroImage !== NEUTRAL_FOOD_PLACEHOLDER) {
+                setHeroImage(NEUTRAL_FOOD_PLACEHOLDER);
+              }
+            }}
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#11241C] via-[#11241C]/65 to-black/20" />
@@ -715,42 +743,6 @@ export const RecipeView: React.FC<RecipeViewProps> = ({
             </div>
           </div>
 
-          {/* Master Chef Tips & Secrets (Requirement) */}
-          {cookingTips.length > 0 && (
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#D9E2DC] shadow-sm space-y-3">
-              <h3 className="font-serif text-xl font-bold text-[#1F2421] flex items-center gap-2">
-                <Lightbulb className="w-5 h-5 text-[#4E7A60]" />
-                Master Cooking Tips for {recipeName}
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                {cookingTips.map((tip, i) => (
-                  <div
-                    key={i}
-                    className="p-3.5 rounded-2xl bg-[#F4F9F6] border border-[#D1E7DD] text-xs text-[#3D4741] leading-relaxed flex items-start gap-2"
-                  >
-                    <span className="text-[#2D5A43] font-bold text-sm leading-none">•</span>
-                    <span>{tip}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Cultural Heritage Story */}
-          {recipe.cultural_background && (
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-[#D9E2DC] shadow-sm">
-              <div className="flex items-center gap-2 text-[#2D5A43] text-xs uppercase font-bold tracking-wider mb-2">
-                <Info className="w-4 h-4 text-[#4E7A60]" />
-                Cultural Origin & Heritage
-              </div>
-              <h3 className="font-serif text-xl font-bold text-[#1F2421] mb-2">
-                The Heritage of {recipeName}
-              </h3>
-              <p className="text-[#5C665F] text-sm leading-relaxed font-light">
-                {recipe.cultural_background}
-              </p>
-            </div>
-          )}
 
           {/* Serving Suggestions & Authentic Pairings (Requirement) */}
           {servingSuggestions.length > 0 && (
@@ -771,28 +763,6 @@ export const RecipeView: React.FC<RecipeViewProps> = ({
               </div>
             </div>
           )}
-
-          {/* Conversational Assistant Banner */}
-          <div className="p-6 rounded-3xl bg-[#F4F9F6] border border-[#D1E7DD] flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <h4 className="font-serif text-lg font-bold text-[#1F2421]">
-                Have questions or need to customize this recipe?
-              </h4>
-              <p className="text-xs text-[#5C665F]">
-                Ask our AI Cooking Assistant to adjust portions, omit ingredients, or explain techniques!
-              </p>
-            </div>
-            {onOpenAssistantForRecipe && (
-              <button
-                type="button"
-                onClick={() => onOpenAssistantForRecipe(`Can I customize ${recipeName}?`)}
-                className="px-5 py-2.5 rounded-2xl bg-[#1E3A2F] hover:bg-[#284E3F] text-white text-xs sm:text-sm font-bold transition-all shadow-md flex items-center gap-2 whitespace-nowrap cursor-pointer"
-              >
-                <ChefHat className="w-4 h-4 text-[#D1E7DD]" />
-                <span>Chat with AI Cooking Assistant</span>
-              </button>
-            )}
-          </div>
         </div>
       </div>
     </article>

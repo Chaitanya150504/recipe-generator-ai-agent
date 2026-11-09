@@ -37,7 +37,11 @@ async function parseRequestBody(req: any): Promise<any> {
   });
 }
 
-function cleanJsonOutput(text: string): string {
+function extractSingleJsonArray<T = any>(text: string): T {
+  if (!text || typeof text !== 'string') {
+    throw new Error('Empty or invalid response from AI model.');
+  }
+
   let cleaned = text.trim();
   if (cleaned.startsWith('```json')) {
     cleaned = cleaned.slice(7);
@@ -47,7 +51,61 @@ function cleanJsonOutput(text: string): string {
   if (cleaned.endsWith('```')) {
     cleaned = cleaned.slice(0, -3);
   }
-  return cleaned.trim();
+  cleaned = cleaned.trim();
+
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (Array.isArray(parsed)) return parsed as unknown as T;
+  } catch {
+    // try balanced bracket extraction
+  }
+
+  const startIndex = cleaned.indexOf('[');
+  if (startIndex === -1) {
+    throw new Error('Failed to find JSON array in AI response.');
+  }
+
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+  let endIndex = -1;
+
+  for (let i = startIndex; i < cleaned.length; i++) {
+    const char = cleaned[i];
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+    if (char === '\\') {
+      escapeNext = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === '[') {
+        depth++;
+      } else if (char === ']') {
+        depth--;
+        if (depth === 0) {
+          endIndex = i;
+          break;
+        }
+      }
+    }
+  }
+
+  if (endIndex === -1) {
+    const lastBracket = cleaned.lastIndexOf(']');
+    if (lastBracket > startIndex) {
+      return JSON.parse(cleaned.substring(startIndex, lastBracket + 1));
+    }
+    throw new Error('Unbalanced JSON array in AI response.');
+  }
+
+  return JSON.parse(cleaned.substring(startIndex, endIndex + 1));
 }
 
 async function callGemini(contents: string, systemInstruction: string): Promise<string> {
@@ -141,8 +199,7 @@ Return JSON array with:
       'You are a culinary science expert. Output strictly valid JSON array of substitutes.'
     );
 
-    const cleaned = cleanJsonOutput(rawText);
-    const parsed = JSON.parse(cleaned ?? '[]');
+    const parsed = extractSingleJsonArray<any[]>(rawText);
     return res.status(200).json({ substitutes: parsed });
   } catch (error: any) {
     console.error('[Diagnostic] Error finding substitutes:', error);

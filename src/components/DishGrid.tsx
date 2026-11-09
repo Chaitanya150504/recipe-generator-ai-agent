@@ -150,13 +150,8 @@ export const DishGrid: React.FC<DishGridProps> = ({
 
                 <div className="absolute top-3 right-3">{getSpiceBadge(dish.spiceLevel)}</div>
 
-                {/* Native Name / Subtitle overlay */}
+                {/* Dish Name overlay */}
                 <div className="absolute bottom-3 left-3 right-3 text-white">
-                  {dish.nativeName && (
-                    <p className="text-xs font-medium text-[#D1E7DD] tracking-wide font-sans">
-                      {dish.nativeName}
-                    </p>
-                  )}
                   <h3 className="font-serif text-lg font-bold leading-tight drop-shadow-sm group-hover:text-[#D1E7DD] transition-colors">
                     {dish.name}
                   </h3>

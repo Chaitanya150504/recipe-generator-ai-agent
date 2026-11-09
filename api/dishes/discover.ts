@@ -59,36 +59,134 @@ function cleanJsonOutput(text: string): string {
   return cleaned.trim();
 }
 
-/**
- * Maps dish name / cuisine to high-quality culinary imagery.
- */
-function getCulinaryImage(dishName: string, cuisineOrRegion = ''): string {
-  const q = (dishName + ' ' + cuisineOrRegion).toLowerCase();
-  if (q.includes('biryani') || q.includes('pulao') || q.includes('rice')) {
-    return 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=1000&q=80';
+export const NEUTRAL_FOOD_PLACEHOLDER =
+  'https://images.unsplash.com/photo-1495521821757-a1efb6729352?auto=format&fit=crop&w=1200&q=80';
+
+export const VERIFIED_DISH_IMAGES: Record<string, string> = {
+  'bread pakoda':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Bread_Pakora_%28Stuffed_with_Mashed-Spicy_Potatoes%29.JPG/1280px-Bread_Pakora_%28Stuffed_with_Mashed-Spicy_Potatoes%29.JPG',
+  'bread pakora':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Bread_Pakora_%28Stuffed_with_Mashed-Spicy_Potatoes%29.JPG/1280px-Bread_Pakora_%28Stuffed_with_Mashed-Spicy_Potatoes%29.JPG',
+  'egg bhurji':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Spicy_egg_bhurji_%40_the_eggfactory.jpg/1280px-Spicy_egg_bhurji_%40_the_eggfactory.jpg',
+  'anda bhurji':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Spicy_egg_bhurji_%40_the_eggfactory.jpg/1280px-Spicy_egg_bhurji_%40_the_eggfactory.jpg',
+  'andhra chicken fry':
+    'https://upload.wikimedia.org/wikipedia/commons/9/96/Andhra_Fried_Chicken.JPG',
+  'kodi vepudu':
+    'https://upload.wikimedia.org/wikipedia/commons/9/96/Andhra_Fried_Chicken.JPG',
+  'chicken curry':
+    'https://upload.wikimedia.org/wikipedia/commons/5/51/Chicken_curry_at_Divewalk_Cafe_-_Sarah_Stierch.jpg',
+  'andhra chicken curry':
+    'https://upload.wikimedia.org/wikipedia/commons/5/51/Chicken_curry_at_Divewalk_Cafe_-_Sarah_Stierch.jpg',
+  'andhra kodi kura':
+    'https://upload.wikimedia.org/wikipedia/commons/5/51/Chicken_curry_at_Divewalk_Cafe_-_Sarah_Stierch.jpg',
+  'japanese ramen':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Shoyu_Ramen%EF%BC%88Tokyo_Ramen%EF%BC%89_-_01.jpg/1280px-Shoyu_Ramen%EF%BC%88Tokyo_Ramen%EF%BC%89_-_01.jpg',
+  'shoyu ramen':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Shoyu_Ramen%EF%BC%88Tokyo_Ramen%EF%BC%89_-_01.jpg/1280px-Shoyu_Ramen%EF%BC%88Tokyo_Ramen%EF%BC%89_-_01.jpg',
+  'ramen':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Shoyu_Ramen%EF%BC%88Tokyo_Ramen%EF%BC%89_-_01.jpg/1280px-Shoyu_Ramen%EF%BC%88Tokyo_Ramen%EF%BC%89_-_01.jpg',
+  'masala dosa':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Masala_Dosa_2023.jpg/1280px-Masala_Dosa_2023.jpg',
+  'dosa':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Masala_Dosa_2023.jpg/1280px-Masala_Dosa_2023.jpg',
+  'pesarattu':
+    'https://upload.wikimedia.org/wikipedia/commons/d/d4/Pesarattu_with_ginger_chutney.jpg',
+  'gongura pachadi':
+    'https://upload.wikimedia.org/wikipedia/commons/9/99/Gongura_chutney.jpg',
+  'gutti vankaya':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/Aloo_Gobi_curry.jpg/1280px-Aloo_Gobi_curry.jpg',
+  'idli':
+    'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=1200&q=80',
+  'spaghetti carbonara':
+    'https://images.unsplash.com/photo-1612874742237-6526221588e3?auto=format&fit=crop&w=1200&q=80',
+  'carbonara':
+    'https://images.unsplash.com/photo-1612874742237-6526221588e3?auto=format&fit=crop&w=1200&q=80',
+  'pizza margherita':
+    'https://images.unsplash.com/photo-1604382355076-af4b0eb60143?auto=format&fit=crop&w=1200&q=80',
+  'tacos al pastor':
+    'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=1200&q=80',
+  'hyderabadi dum biryani':
+    'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=1200&q=80',
+  'biryani':
+    'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=1200&q=80',
+  'potato fry':
+    'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=1200&q=80',
+  'aloo fry':
+    'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=1200&q=80',
+  'aloo vepudu':
+    'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=1200&q=80',
+};
+
+function normalizeQuery(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^\w\s]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function resolveExactFoodImage(dishName: string, requestedDish = ''): Promise<string> {
+  const primary = (requestedDish || dishName || '').trim();
+  if (!primary) return NEUTRAL_FOOD_PLACEHOLDER;
+
+  const norm = normalizeQuery(primary);
+  if (VERIFIED_DISH_IMAGES[norm]) {
+    return VERIFIED_DISH_IMAGES[norm];
   }
-  if (q.includes('pizza') || q.includes('focaccia')) {
-    return 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1000&q=80';
+  for (const [key, url] of Object.entries(VERIFIED_DISH_IMAGES)) {
+    if (norm === key || (key.length > 4 && (norm.includes(key) || key.includes(norm)))) {
+      return url;
+    }
   }
-  if (q.includes('pasta') || q.includes('carbonara') || q.includes('ragu') || q.includes('spaghetti')) {
-    return 'https://images.unsplash.com/photo-1621996346565-e3d5d6281691?auto=format&fit=crop&w=1000&q=80';
+
+  try {
+    const commonsUrl = `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(
+      primary + ' food'
+    )}&gsrnamespace=6&gsrlimit=5&prop=imageinfo&iiprop=url&iiurlwidth=1280&format=json&origin=*`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2500);
+
+    const res = await fetch(commonsUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'GlobalRecipeAgent/1.0 (https://ais-dev.run.app; recipeagent@aistudio.build)',
+      },
+    });
+    clearTimeout(timeout);
+
+    if (res.ok) {
+      const data: any = await res.json();
+      const pages = data?.query?.pages;
+      if (pages) {
+        for (const pageId of Object.keys(pages)) {
+          const page = pages[pageId];
+          const title = (page.title || '').toLowerCase();
+          if (
+            title.includes('logo') ||
+            title.includes('map') ||
+            title.includes('flag') ||
+            title.includes('building') ||
+            title.includes('street') ||
+            title.includes('diagram')
+          ) {
+            continue;
+          }
+          const imgInfo = page.imageinfo?.[0];
+          const bestUrl = imgInfo?.thumburl || imgInfo?.url;
+          if (bestUrl && (bestUrl.endsWith('.jpg') || bestUrl.endsWith('.jpeg') || bestUrl.endsWith('.png') || bestUrl.endsWith('.JPG'))) {
+            return bestUrl;
+          }
+        }
+      }
+    }
+  } catch {
+    // Timeout or network failure on image search
   }
-  if (q.includes('ramen') || q.includes('noodle') || q.includes('pho') || q.includes('udon')) {
-    return 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1000&q=80';
-  }
-  if (q.includes('sushi') || q.includes('sashimi')) {
-    return 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=1000&q=80';
-  }
-  if (q.includes('taco') || q.includes('burrito') || q.includes('enchilada') || q.includes('mole')) {
-    return 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=1000&q=80';
-  }
-  if (q.includes('curry') || q.includes('paneer') || q.includes('masala') || q.includes('tikka') || q.includes('dal') || q.includes('gongura')) {
-    return 'https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=1000&q=80';
-  }
-  if (q.includes('dosa') || q.includes('idli') || q.includes('appam') || q.includes('pesarattu')) {
-    return 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?auto=format&fit=crop&w=1000&q=80';
-  }
-  return 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1000&q=80';
+
+  return NEUTRAL_FOOD_PLACEHOLDER;
 }
 
 /**
@@ -232,10 +330,12 @@ Output strictly valid JSON array of dish objects matching these keys.`;
       throw new Error(`AI returned an empty or invalid dishes list for "${target}".`);
     }
 
-    const enriched = parsed.map((d: any) => ({
-      ...d,
-      imageUrl: getCulinaryImage(d.name + ' ' + (d.searchKeyword || ''), d.cuisine || target),
-    }));
+    const enriched = await Promise.all(
+      parsed.map(async (d: any) => ({
+        ...d,
+        imageUrl: await resolveExactFoodImage(d.name, d.name),
+      }))
+    );
 
     console.log(`[Diagnostic] Successfully discovered ${enriched.length} dishes for "${target}"`);
     return res.status(200).json({ dishes: enriched, source: 'ai' });
