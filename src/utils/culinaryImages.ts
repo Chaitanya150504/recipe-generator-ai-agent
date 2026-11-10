@@ -35,10 +35,29 @@ export const VERIFIED_DISH_IMAGES: Record<string, string> = {
     'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=80',
   'ramen':
     'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c3/Shoyu_Ramen%EF%BC%88Tokyo_Ramen%EF%BC%89_-_01.jpg/1280px-Shoyu_Ramen%EF%BC%88Tokyo_Ramen%EF%BC%89_-_01.jpg',
-  'masala dosa':
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Masala_Dosa_2023.jpg/1280px-Masala_Dosa_2023.jpg',
+  // Six core spotlight dishes (Requirement 3 & 4)
+  'aloo paratha':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Aloo_Paratha.jpg/1280px-Aloo_Paratha.jpg',
+  'fried idli':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Fried_Idli-south_north_fusion.jpg/1280px-Fried_Idli-south_north_fusion.jpg',
   'dosa':
     'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Masala_Dosa_2023.jpg/1280px-Masala_Dosa_2023.jpg',
+  'masala dosa':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Masala_Dosa_2023.jpg/1280px-Masala_Dosa_2023.jpg',
+  'arbi masala':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Arbi_fry.jpg/1280px-Arbi_fry.jpg',
+  'sukhi arbi':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Arbi_fry.jpg/1280px-Arbi_fry.jpg',
+  'arbi curry':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Arbi_fry.jpg/1280px-Arbi_fry.jpg',
+  'chicken biryani':
+    'https://upload.wikimedia.org/wikipedia/commons/b/b5/Chicken_biryani_02-06-2015_%28India%29.jpg',
+  'chicken pachadi':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Andhra_Chicken_Pickle.jpg/1280px-Andhra_Chicken_Pickle.jpg',
+  'andhra chicken pickle':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Andhra_Chicken_Pickle.jpg/1280px-Andhra_Chicken_Pickle.jpg',
+  'chicken pickle':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Andhra_Chicken_Pickle.jpg/1280px-Andhra_Chicken_Pickle.jpg',
 
   // Other iconic authentic dishes
   'idli':

@@ -8,8 +8,6 @@ import {
   Copy,
   Check,
   RotateCcw,
-  Volume2,
-  VolumeX,
   Play,
   Pause,
   ArrowLeft,
@@ -97,8 +95,6 @@ export const RecipeView: React.FC<RecipeViewProps> = ({
     isRunning: boolean;
   } | null>(null);
 
-  // Speech narration state
-  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [copiedSuccess, setCopiedSuccess] = useState<boolean>(false);
 
   // Completed steps tracker
@@ -173,35 +169,6 @@ export const RecipeView: React.FC<RecipeViewProps> = ({
     setTimeout(() => setCopiedSuccess(false), 2500);
   };
 
-  const handleToggleSpeech = () => {
-    if (!('speechSynthesis' in window)) {
-      alert('Text-to-speech is not supported in this browser.');
-      return;
-    }
-
-    if (isSpeaking) {
-      window.speechSynthesis.cancel();
-      setIsSpeaking(false);
-      return;
-    }
-
-    const intro = `Recipe for ${recipeName}, from ${recipe.region || recipe.country || 'our global collection'}. `;
-    const stepsText = (recipe.cooking_instructions || recipe.instructions || [])
-      .map(
-        (s, i) =>
-          `Step ${s.step_number || (s as any).stepNumber || i + 1}: ${s.title}. ${s.description || (s as any).instruction}`
-      )
-      .join('. ');
-
-    const utterance = new SpeechSynthesisUtterance(intro + stepsText);
-    utterance.rate = 0.95;
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    setIsSpeaking(true);
-    window.speechSynthesis.speak(utterance);
-  };
-
   // Group ingredients by category
   const groupedIngredients = (recipe.ingredients || []).reduce<Record<string, RecipeIngredient[]>>(
     (acc, ing) => {
@@ -266,24 +233,6 @@ export const RecipeView: React.FC<RecipeViewProps> = ({
               <span>Ask AI Cooking Assistant</span>
             </button>
           )}
-
-          {/* Audio Guide */}
-          <button
-            onClick={handleToggleSpeech}
-            className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-medium border transition-colors flex items-center gap-1.5 cursor-pointer ${
-              isSpeaking
-                ? 'bg-[#1E3A2F] text-white border-[#1E3A2F] shadow-sm font-bold'
-                : 'bg-white text-[#3D4741] border-[#D9E2DC] hover:bg-[#F3F7F5]'
-            }`}
-            title="Read instructions aloud"
-          >
-            {isSpeaking ? (
-              <VolumeX className="w-4 h-4 text-[#D1E7DD]" />
-            ) : (
-              <Volume2 className="w-4 h-4 text-[#4E7A60]" />
-            )}
-            <span className="hidden sm:inline">{isSpeaking ? 'Stop Audio' : 'Audio Guide'}</span>
-          </button>
 
           {/* Print button */}
           <button

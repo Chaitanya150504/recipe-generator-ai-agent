@@ -10,14 +10,14 @@ interface HeroSearchProps {
 }
 
 const POPULAR_DISH_SUGGESTIONS = [
-  'Andhra Chicken Curry',
-  'Gongura Pachadi',
+  'Aloo Paratha',
+  'Fried Idli',
+  'Dosa',
+  'Arbi Masala',
+  'Chicken Biryani',
+  'Chicken Pachadi',
   'Japanese Ramen',
-  'Pesarattu Upma',
   'Italian Carbonara',
-  'Hyderabadi Dum Biryani',
-  'Thai Green Curry',
-  'Mexican Birria Tacos',
   'Classic Margherita Pizza',
 ];
 

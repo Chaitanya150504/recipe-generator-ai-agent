@@ -7,7 +7,6 @@ interface DishGridProps {
   isLoading: boolean;
   selectedLabel: string;
   onSelectDish: (dish: DishPreview) => void;
-  onCustomRecipeRequest: (dishName: string) => void;
 }
 
 export const DishGrid: React.FC<DishGridProps> = ({
@@ -15,7 +14,6 @@ export const DishGrid: React.FC<DishGridProps> = ({
   isLoading,
   selectedLabel,
   onSelectDish,
-  onCustomRecipeRequest,
 }) => {
   const getSpiceBadge = (level: string) => {
     switch (level) {
@@ -51,38 +49,17 @@ export const DishGrid: React.FC<DishGridProps> = ({
   return (
     <section className="py-10 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-[#1F2421]">
       {/* Section Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#E8ECE9]">
-        <div>
-          <div className="flex items-center gap-2 text-[#2D5A43] text-xs font-bold uppercase tracking-wider">
-            <Sparkles className="w-3.5 h-3.5 text-[#4E7A60]" />
-            Regional Culinary Spotlight
-          </div>
-          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#1F2421] mt-1">
-            {selectedLabel ? `Iconic Dishes from ${selectedLabel}` : 'Popular Regional Specialties'}
-          </h2>
-          <p className="text-sm text-[#5C665F] mt-1">
-            Select any dish below to generate its authentic, step-by-step master recipe with exact measurements.
-          </p>
+      <div className="pb-6 border-b border-[#E8ECE9]">
+        <div className="flex items-center gap-2 text-[#2D5A43] text-xs font-bold uppercase tracking-wider">
+          <Sparkles className="w-3.5 h-3.5 text-[#4E7A60]" />
+          Regional Culinary Spotlight
         </div>
-
-        {/* Quick Custom Dish Generate */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              const custom = window.prompt(
-                `Enter any specific dish name from ${selectedLabel || 'around the world'} you'd like to cook:`,
-                ''
-              );
-              if (custom && custom.trim()) {
-                onCustomRecipeRequest(custom.trim());
-              }
-            }}
-            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-[#1E3A2F] hover:bg-[#284E3F] text-white transition-colors shadow-sm flex items-center gap-1.5 cursor-pointer"
-          >
-            <ChefHat className="w-4 h-4 text-[#D1E7DD]" />
-            <span>Request Custom Dish</span>
-          </button>
-        </div>
+        <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#1F2421] mt-1">
+          {selectedLabel ? `Iconic Dishes from ${selectedLabel}` : 'Popular Regional Specialties'}
+        </h2>
+        <p className="text-sm text-[#5C665F] mt-1">
+          Select any dish below to generate its authentic, step-by-step master recipe with exact measurements.
+        </p>
       </div>
 
       {/* Loading Skeletons */}

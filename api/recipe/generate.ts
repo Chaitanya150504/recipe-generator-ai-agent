@@ -92,6 +92,24 @@ export const VERIFIED_DISH_IMAGES: Record<string, string> = {
     'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Masala_Dosa_2023.jpg/1280px-Masala_Dosa_2023.jpg',
   'dosa':
     'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Masala_Dosa_2023.jpg/1280px-Masala_Dosa_2023.jpg',
+  'aloo paratha':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Aloo_Paratha.jpg/1280px-Aloo_Paratha.jpg',
+  'fried idli':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Fried_Idli-south_north_fusion.jpg/1280px-Fried_Idli-south_north_fusion.jpg',
+  'arbi masala':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Arbi_fry.jpg/1280px-Arbi_fry.jpg',
+  'sukhi arbi':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Arbi_fry.jpg/1280px-Arbi_fry.jpg',
+  'arbi curry':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1f/Arbi_fry.jpg/1280px-Arbi_fry.jpg',
+  'chicken biryani':
+    'https://upload.wikimedia.org/wikipedia/commons/b/b5/Chicken_biryani_02-06-2015_%28India%29.jpg',
+  'chicken pachadi':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Andhra_Chicken_Pickle.jpg/1280px-Andhra_Chicken_Pickle.jpg',
+  'andhra chicken pickle':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Andhra_Chicken_Pickle.jpg/1280px-Andhra_Chicken_Pickle.jpg',
+  'chicken pickle':
+    'https://upload.wikimedia.org/wikipedia/commons/thumb/f/f3/Andhra_Chicken_Pickle.jpg/1280px-Andhra_Chicken_Pickle.jpg',
   'pesarattu':
     'https://upload.wikimedia.org/wikipedia/commons/d/d4/Pesarattu_with_ginger_chutney.jpg',
   'gongura pachadi':

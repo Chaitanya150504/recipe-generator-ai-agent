@@ -12,11 +12,12 @@ import { AICookingAssistant } from './components/AICookingAssistant';
 import { SubstitutionModal } from './components/SubstitutionModal';
 import { DietaryPreference, DishPreview, RecipeData, ChatMessage } from './types';
 import { ChefHat, Globe2, AlertCircle, X } from 'lucide-react';
+import { SPOTLIGHT_DISHES } from './data/cuisines';
 
 export default function App() {
   const [currentDietary, setCurrentDietary] = useState<DietaryPreference>('all');
-  const [activeFilterLabel, setActiveFilterLabel] = useState<string>('Andhra Pradesh');
-  const [dishes, setDishes] = useState<DishPreview[]>([]);
+  const [activeFilterLabel, setActiveFilterLabel] = useState<string>('Regional Spotlight');
+  const [dishes, setDishes] = useState<DishPreview[]>(SPOTLIGHT_DISHES);
   const [isDishesLoading, setIsDishesLoading] = useState<boolean>(false);
 
   // Selected recipe state
@@ -38,7 +39,7 @@ export default function App() {
       content: `Hello! I'm your Global Recipe AI Cooking Assistant.
 
 You can ask me to:
-• Generate authentic recipes from any region (e.g. *"Gongura Pachadi"*, *"Japanese Ramen"*, or *"Andhra Chicken Curry"*)
+• Generate authentic recipes from any region (e.g. *"Aloo Paratha"*, *"Chicken Biryani"*, or *"Japanese Ramen"*)
 • Adjust portions for your group (e.g. *"Make this recipe for 5 people"*)
 • Omit or substitute ingredients (e.g. *"Can I prepare this without onions?"* or *"What can I use instead of tamarind?"*)
 • Clarify techniques (e.g. *"Explain step 3 in more detail"*)
@@ -51,9 +52,10 @@ What dish would you like to prepare today?`,
   // Error state
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Initial load: Discover featured regional dishes for inspiration
+  // Initial load: Set the 6 popular spotlight dishes
   useEffect(() => {
-    fetchDishes({ region: 'Andhra Pradesh', dietary: 'all' });
+    setDishes(SPOTLIGHT_DISHES);
+    setActiveFilterLabel('Regional Spotlight');
   }, []);
 
   // Fetch dishes from server
@@ -382,7 +384,6 @@ Feel free to ask me follow-up questions such as:
             isLoading={isDishesLoading}
             selectedLabel={activeFilterLabel}
             onSelectDish={(dish) => handleGenerateRecipe(dish.name, dish.region)}
-            onCustomRecipeRequest={(dishName) => handleGenerateRecipe(dishName)}
           />
         )}
       </main>
