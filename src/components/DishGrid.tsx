@@ -7,6 +7,8 @@ interface DishGridProps {
   isLoading: boolean;
   selectedLabel: string;
   onSelectDish: (dish: DishPreview) => void;
+  isRecipeLoading?: boolean;
+  loadingDishName?: string;
 }
 
 export const DishGrid: React.FC<DishGridProps> = ({
@@ -14,6 +16,8 @@ export const DishGrid: React.FC<DishGridProps> = ({
   isLoading,
   selectedLabel,
   onSelectDish,
+  isRecipeLoading,
+  loadingDishName,
 }) => {
   const getSpiceBadge = (level: string) => {
     switch (level) {
@@ -179,11 +183,21 @@ export const DishGrid: React.FC<DishGridProps> = ({
                 {/* Cook Action Button */}
                 <button
                   onClick={() => onSelectDish(dish)}
-                  className="w-full mt-2 py-2.5 px-4 rounded-xl font-semibold text-xs sm:text-sm bg-[#1E3A2F] hover:bg-[#284E3F] text-white shadow-sm transition-all flex items-center justify-center gap-2 group-hover:scale-[1.02] active:scale-95 cursor-pointer"
+                  disabled={isRecipeLoading}
+                  className="w-full mt-2 py-2.5 px-4 rounded-xl font-semibold text-xs sm:text-sm bg-[#1E3A2F] hover:bg-[#284E3F] text-white shadow-sm transition-all flex items-center justify-center gap-2 group-hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
                 >
-                  <ChefHat className="w-4 h-4 text-[#D1E7DD]" />
-                  <span>Generate Full Recipe</span>
-                  <ArrowRight className="w-4 h-4 text-[#D1E7DD]" />
+                  {isRecipeLoading && loadingDishName?.toLowerCase() === dish.name.toLowerCase() ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Generating Recipe...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChefHat className="w-4 h-4 text-[#D1E7DD]" />
+                      <span>Generate Full Recipe</span>
+                      <ArrowRight className="w-4 h-4 text-[#D1E7DD]" />
+                    </>
+                  )}
                 </button>
               </div>
             </article>

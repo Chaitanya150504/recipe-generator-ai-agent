@@ -197,39 +197,87 @@ async function callGemini(contents: string, systemInstruction: string): Promise<
     httpOptions: { headers: { 'User-Agent': 'aistudio-recipe-generator' } },
   });
 
-  const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
+  const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let lastError: any = null;
 
-  for (const model of candidateModels) {
-    try {
-      const response = await Promise.race([
-        ai.models.generateContent({
-          model,
-          contents,
-          config: {
-            systemInstruction,
-            responseMimeType: 'application/json',
-          },
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Timeout after 25s on model ${model}`)), 25000)
-        ),
-      ]);
+  const isTransient = (err: any) => {
+    const status = err?.status;
+    const msg = (err?.message || '').toUpperCase();
+    return (
+      status === 503 ||
+      status === 502 ||
+      status === 504 ||
+      msg.includes('UNAVAILABLE') ||
+      msg.includes('TIMEOUT') ||
+      msg.includes('OVERLOADED') ||
+      msg.includes('DEADLINE_EXCEEDED') ||
+      msg.includes('ETIMEDOUT') ||
+      msg.includes('ECONNRESET')
+    );
+  };
 
-      const text = response.text;
-      if (text && text.trim()) return text.trim();
-    } catch (err: any) {
-      lastError = err;
-      if (err?.status === 403 || err?.message?.includes('API_KEY_INVALID') || err?.message?.includes('PERMISSION_DENIED')) {
-        const error: any = new Error('The configured GEMINI_API_KEY is invalid or lacks permissions. Please check your Google AI Studio API key.');
-        error.status = 403;
-        throw error;
+  const isQuotaExhausted = (err: any) => {
+    const status = err?.status;
+    const msg = (err?.message || '').toUpperCase();
+    return status === 429 || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('QUOTA');
+  };
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  for (const model of candidateModels) {
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const response = await Promise.race([
+          ai.models.generateContent({
+            model,
+            contents,
+            config: {
+              systemInstruction,
+              responseMimeType: 'application/json',
+            },
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`Timeout after 25s on model ${model}`)), 25000)
+          ),
+        ]);
+
+        const text = response.text;
+        if (text && text.trim()) return text.trim();
+      } catch (err: any) {
+        lastError = err;
+        if (err?.status === 403 || err?.message?.includes('API_KEY_INVALID') || err?.message?.includes('PERMISSION_DENIED')) {
+          const error: any = new Error('The configured GEMINI_API_KEY is invalid or lacks permissions. Please check your Google AI Studio API key.');
+          error.status = 403;
+          throw error;
+        }
+
+        if (isQuotaExhausted(err)) {
+          break;
+        }
+
+        if (isTransient(err) && attempt < maxAttempts) {
+          const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+          await sleep(backoffMs);
+          continue;
+        }
+
+        break;
       }
     }
   }
 
-  const status = lastError?.status || (lastError?.message?.includes('RESOURCE_EXHAUSTED') ? 429 : 500);
-  const error: any = new Error(lastError?.message || 'All AI models failed to process chat');
+  const status = lastError?.status ||
+    (isQuotaExhausted(lastError) ? 429 :
+    isTransient(lastError) ? 503 : 500);
+
+  const friendlyMessage = status === 429
+    ? 'Gemini API daily quota limit reached (HTTP 429). Please wait a moment or try again later.'
+    : status === 503
+    ? 'Gemini AI service is temporarily experiencing high traffic (HTTP 503). All retry attempts were exhausted. Please try again in a few moments.'
+    : lastError?.message || 'All AI models failed to process chat';
+
+  const error: any = new Error(friendlyMessage);
   error.status = status;
   throw error;
 }

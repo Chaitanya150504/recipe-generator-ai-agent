@@ -72,60 +72,112 @@ async function generateAIContent(options: {
 
   const timeoutMs = options.timeoutMs || 25000;
   // Models to attempt:
-  // 1. gemini-3.1-flash-lite (fast, active free tier quota, verified operational)
-  // 2. gemini-3.8-flash (standard multimodal flash)
+  // 1. gemini-3.8-flash (user's target primary model)
+  // 2. gemini-3.1-flash-lite (high availability, generous quota fallback)
   // 3. gemini-flash-latest (fallback alias)
-  const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
+  const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
   let lastError: any = null;
 
+  const isTransient = (err: any) => {
+    const status = err?.status;
+    const msg = (err?.message || '').toUpperCase();
+    return (
+      status === 503 ||
+      status === 502 ||
+      status === 504 ||
+      msg.includes('UNAVAILABLE') ||
+      msg.includes('TIMEOUT') ||
+      msg.includes('OVERLOADED') ||
+      msg.includes('DEADLINE_EXCEEDED') ||
+      msg.includes('ETIMEDOUT') ||
+      msg.includes('ECONNRESET')
+    );
+  };
+
+  const isQuotaExhausted = (err: any) => {
+    const status = err?.status;
+    const msg = (err?.message || '').toUpperCase();
+    return status === 429 || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('QUOTA');
+  };
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
   for (const model of candidateModels) {
-    const startTime = Date.now();
-    try {
-      console.log(`[Diagnostic] (server.ts) Attempting model "${model}"...`);
-      const response = await Promise.race([
-        client.models.generateContent({
-          model,
-          contents: options.contents,
-          config: {
-            systemInstruction: options.systemInstruction,
-            responseMimeType: options.responseMimeType || 'application/json',
-          },
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`AI generation timed out after ${timeoutMs}ms on model ${model}`)), timeoutMs)
-        ),
-      ]);
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const startTime = Date.now();
+      try {
+        console.log(`[Diagnostic] (server.ts) Attempting model "${model}" (Attempt ${attempt}/${maxAttempts})...`);
+        const response = await Promise.race([
+          client.models.generateContent({
+            model,
+            contents: options.contents,
+            config: {
+              systemInstruction: options.systemInstruction,
+              responseMimeType: options.responseMimeType || 'application/json',
+            },
+          }),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`AI generation timed out after ${timeoutMs}ms on model ${model}`)), timeoutMs)
+          ),
+        ]);
 
-      const text = response.text;
-      if (text && text.trim()) {
-        console.log(`[Diagnostic] (server.ts) Model "${model}" succeeded in ${Date.now() - startTime}ms`);
-        return text.trim();
-      }
-    } catch (err: any) {
-      const elapsed = Date.now() - startTime;
-      console.warn(`[Diagnostic] (server.ts) Model "${model}" failed after ${elapsed}ms:`, {
-        status: err?.status,
-        code: err?.code,
-        message: err?.message,
-      });
-      lastError = err;
+        const text = response.text;
+        if (text && text.trim()) {
+          console.log(`[Diagnostic] (server.ts) Model "${model}" succeeded on attempt ${attempt} in ${Date.now() - startTime}ms`);
+          return text.trim();
+        }
+      } catch (err: any) {
+        const elapsed = Date.now() - startTime;
+        console.error(`[Diagnostic] (server.ts) Model "${model}" attempt ${attempt} failed after ${elapsed}ms:`, {
+          status: err?.status,
+          code: err?.code,
+          message: err?.message,
+        });
+        lastError = err;
 
-      if (err?.status === 403 || err?.message?.includes('API_KEY_INVALID') || err?.message?.includes('PERMISSION_DENIED')) {
-        const error: any = new Error('The configured GEMINI_API_KEY is invalid or lacks permissions. Please check your Google AI Studio API key.');
-        error.status = 403;
-        error.code = 'AUTH_ERROR';
-        throw error;
+        // 1. Never retry when API key is unauthorized/invalid
+        if (err?.status === 403 || err?.message?.includes('API_KEY_INVALID') || err?.message?.includes('PERMISSION_DENIED')) {
+          const error: any = new Error('The configured GEMINI_API_KEY is invalid or lacks permissions. Please check your Google AI Studio API key.');
+          error.status = 403;
+          error.code = 'AUTH_ERROR';
+          throw error;
+        }
+
+        // 2. Handle 429 quota errors separately. Do NOT retry when daily quota is exhausted.
+        if (isQuotaExhausted(err)) {
+          console.warn(`[Diagnostic] (server.ts) 429 Quota exhausted on model "${model}". Skipping retry for this model.`);
+          break; // Try next candidate model with available quota instead of retrying a spent model
+        }
+
+        // 3. Retry on temporary 503, 502, 504 errors using exponential backoff (e.g. 1000ms, 2000ms)
+        if (isTransient(err) && attempt < maxAttempts) {
+          const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 4000);
+          console.log(`[Diagnostic] (server.ts) Transient error (${err?.status || '503'}). Backing off for ${backoffMs}ms before retry ${attempt + 1}...`);
+          await sleep(backoffMs);
+          continue;
+        }
+
+        // If not transient or reached maxAttempts, break to next candidate model
+        break;
       }
     }
   }
 
+  // Determine final status & clear friendly error
   const status = lastError?.status ||
-    (lastError?.message?.includes('RESOURCE_EXHAUSTED') ? 429 :
-    lastError?.message?.includes('UNAVAILABLE') ? 503 : 500);
+    (isQuotaExhausted(lastError) ? 429 :
+    isTransient(lastError) ? 503 : 500);
 
-  const error: any = new Error(lastError?.message || 'All AI models failed to generate content');
+  const friendlyMessage = status === 429
+    ? 'Gemini API daily quota limit reached (HTTP 429). Please wait a moment or try again later.'
+    : status === 503
+    ? 'Gemini AI service is temporarily experiencing high traffic (HTTP 503). All retry attempts were exhausted. Please try again in a few moments.'
+    : lastError?.message || 'Failed to generate recipe from AI service.';
+
+  const error: any = new Error(friendlyMessage);
   error.status = status;
-  error.code = lastError?.code || (status === 429 ? 'RATE_LIMIT' : status === 503 ? 'SERVICE_UNAVAILABLE' : 'AI_ERROR');
+  error.code = isQuotaExhausted(lastError) ? 'RATE_LIMIT' : status === 503 ? 'SERVICE_UNAVAILABLE' : 'AI_ERROR';
   throw error;
 }
 

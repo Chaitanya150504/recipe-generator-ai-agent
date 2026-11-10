@@ -105,7 +105,8 @@ What dish would you like to prepare today?`,
 
   // Generate recipe when a dish is requested from Search or Cards
   const handleGenerateRecipe = async (dishName: string, regionOverride?: string) => {
-    if (!dishName.trim()) return;
+    // Prevent duplicate requests when user clicks Generate Recipe multiple times (Requirement 4)
+    if (isRecipeLoading || !dishName.trim()) return;
 
     // Clear previous recipe immediately (Requirement 8)
     setCurrentRecipe(null);
@@ -135,6 +136,8 @@ What dish would you like to prepare today?`,
             message = `Gemini API quota exceeded (HTTP 429: Resource Exhausted). The free tier daily limit has been reached. Please wait a moment or try again later.`;
           } else if (response.status === 403) {
             message = `Gemini API authorization error (HTTP 403). Please verify GEMINI_API_KEY is set in Vercel Project Settings -> Environment Variables.`;
+          } else if (response.status === 503) {
+            message = `Gemini AI service is temporarily experiencing high traffic (HTTP 503). All retry attempts were exhausted. Please try again in a few moments.`;
           } else {
             message = `Failed to generate authentic recipe for "${dishName}" (HTTP ${response.status}).`;
           }
@@ -251,7 +254,7 @@ Feel free to ask me follow-up questions such as:
 
   // Generate Another Recipe
   const handleGenerateAnother = async () => {
-    if (!currentRecipe) return;
+    if (isRecipeLoading || !currentRecipe) return;
     const currentName = currentRecipe.recipe_name || (currentRecipe as any).dishName;
 
     setIsRecipeLoading(true);
@@ -384,6 +387,8 @@ Feel free to ask me follow-up questions such as:
             isLoading={isDishesLoading}
             selectedLabel={activeFilterLabel}
             onSelectDish={(dish) => handleGenerateRecipe(dish.name, dish.region)}
+            isRecipeLoading={isRecipeLoading}
+            loadingDishName={recipeLoadingDishName}
           />
         )}
       </main>
